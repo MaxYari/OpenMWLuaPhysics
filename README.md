@@ -31,6 +31,10 @@ Enable LuaPhysicsEngine.omwscripts in the Launcher
 
 ---
 
+### How to use
+
+Drag items around by holding X (if it doesnt work - check script setting and bind the input at the very bottom of the settings page). While dragging - press LMB to throw.
+
 ### Credits
 
 Sound Effects: Sound effects were recorded, scavenged from freesound.org or otherwise produced by [NimSound](https://nimsound.ru/) and myself. Additionally a sound library "Lesser Vibes" by Sergey Eybog was used.
