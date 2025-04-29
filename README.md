@@ -16,7 +16,6 @@ Apart from being mostly developer-centered api this mod also enables physics all
 
 Install dependencies:
 [OpenMW Impact Effects](https://www.nexusmods.com/morrowind/mods/55508)
-[Impact Sounds](https://www.nexusmods.com/morrowind/mods/52747)
 
 ---
 Download repository, drop the archive into Mod Organiser 2

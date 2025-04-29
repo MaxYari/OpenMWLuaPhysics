@@ -1,4 +1,4 @@
-local mp = "scripts/MaxYari/ReAnimation_v2/"
+local mp = "scripts/MaxYari/LuaPhysics/"
 
 local I = require('openmw.interfaces')
 local animation = require('openmw.animation')
