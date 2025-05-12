@@ -87,7 +87,6 @@ eventHandlers = {
         eData.other -- This is a serialised data of a physics object which triggered the collision, it's a read-only data, no changes to this data will affect the original physics object
     end
 }
-hitResult.hitObject:sendEvent(D.e.CollidingWithPhysObj, {other = self:serialize()})
 ```
 
 More importantly a set of custom event exposed on a `I.LuaPhysics.physicsObject`, note that those are _NOT_ a part of an OpenMW event system. They are only accessible from a local script throug the exposed inteface:
