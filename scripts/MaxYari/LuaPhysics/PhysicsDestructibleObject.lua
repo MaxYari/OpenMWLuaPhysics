@@ -17,6 +17,7 @@ local D = require(mp..'scripts/physics_defs')
 --if omwself.recordId ~= "p_restore_health_s" then return end
 -- print("Destructible object script attached to", omwself.recordId)
 
+
 local eventHandlersAttached = false
 local heldByActor = nil
 local minCollisionDmgSpeed = 2*D.GUtoM
@@ -41,7 +42,6 @@ local function checkHeardByOwnerOrGuards(culprit)
     local owner, guards, factionMembers = PhysAiSystem.findRelevantNPCsInCell(omwself.cell, nearby.actors, ownerId, factionId)
     local checkDetection = function(npcs)
         for _, npc in ipairs(npcs) do
-            print((omwself.position - npc.position):length())
             if (omwself.position - npc.position):length() < crashMaxDetecDist then return npc end
         end
     end

@@ -63,29 +63,6 @@ end))
 return {
     engineHandlers = {
         onUpdate = onUpdate,
-        onKeyPress = function(key)
-            --[[ if key.symbol == 'y' then
-                print("Explode?")
-                PhysicsUtils.ExplodeObjects()
-            end ]]
-            
-            
-            --[[ if key.symbol == 'c' then
-                PhysicsUtils.GetLookAtObject(selfActor:getAttackRange(), function(obj) 
-                    if not obj then return end
-
-                    local direction = camera.viewportToWorldVector(util.vector2(0.5, 0.5)):normalize()
-                    local pos = omwself.position + util.vector3(0,0,120) + direction * 70
-                    core.sendGlobalEvent("GenerateTestChunks", {
-                        cellId = omwself.cell.id,
-                        player = omwself,
-                        position = pos,
-                        object = obj
-                    })
-                end)
-            end         ]]
-         end
-         
     },
     interfaceName = "LuaPhysics",
     interface = interface

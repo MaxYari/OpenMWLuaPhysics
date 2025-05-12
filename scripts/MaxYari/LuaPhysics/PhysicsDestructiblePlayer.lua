@@ -22,6 +22,7 @@ local MaxHitImpulse = 600
 local frame = 0
 local hitProcessedFrame = -1
 
+
 animManager.onHitKey:addEventHandler(function(groupname, key, isMax)
     --print("Animation event", groupname,"Key",key)
     if frame == hitProcessedFrame then return end

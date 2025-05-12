@@ -372,7 +372,7 @@ function PhysicsObject:update(dt)
         self.velocity = self.velocity + Gravity * dt
 
         -- Water Physics
-        local waterline = omwself.cell.waterLevel
+        local waterline = self.object.cell.waterLevel
         if waterline and not PhysicsObject.isSleeping then
             if self.position.z < waterline then
                 -- We are underwater
@@ -385,6 +385,8 @@ function PhysicsObject:update(dt)
                 -- Apply Buoyoncy
                 local buoyForce = Gravity * self.mass * -1 * self.buoyancy
                 self.velocity = self.velocity + buoyForce * dt
+            else
+                self.isUnderwater = false
             end
         end
 

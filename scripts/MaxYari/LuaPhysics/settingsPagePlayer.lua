@@ -26,7 +26,7 @@ I.Settings.registerGroup {
         {
             key = "GrabPhysicsObjectButton",
             renderer = "inputBinding",            
-            default = "x",
+            default = "Grab_physics_object_button",
             name = "Drag Object",
             description = 'Hold to drag an object around, release to drop.',
             argument = {

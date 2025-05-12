@@ -83,7 +83,7 @@ local function buildDebrisMap()
 end
 
 local function findInObjectsMap(map, object)
-    local cleanName = getCleanName(object.type.record(object).model) -- Pass `false` for model names
+    local cleanName = getCleanName(object.type.record(object).model)
     -- look for shatter meshes (generated records) made specifically for this mesh
     local result = map[cleanName]
     if not result then
@@ -248,14 +248,6 @@ local function handleFractureMe(eventData)
         end
     end
     
-    -- print("Object type",object.type,object.recordId)
-    if types.Container.objectIsInstance(object) then
-        -- This logic will be moved to destructible containers mod
-        --handleContainer(eventData)
-    elseif types.Potion.objectIsInstance(object) then
-        -- This logic will be moved to throwable things mod
-        --handlePotion(eventData)
-    end
 
     -- Handle crime
     if flags.handleCrime and settings:get("CrimeSystemActive") and eventData.detectedBy and eventData.culprit and eventData.culprit.type == types.Player then

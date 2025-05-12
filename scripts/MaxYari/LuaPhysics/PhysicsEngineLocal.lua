@@ -141,7 +141,7 @@ physicsObject.onCollision:addEventHandler(onCollision)
 physicsObject.onPhysObjectCollision:addEventHandler(onCollision)
 
 local function onUpdate(dt)
-    if not omwself.count then return end   
+    if physicsObject.isSleeping or not omwself.count then return end   
     
     local cell = omwself.cell
     
@@ -171,9 +171,11 @@ local function onUpdate(dt)
     
     -- Detecting crossing of a water boundary line
     if lastUnderwater ~= physicsObject.isUnderwater then
-        lastUnderwater = physicsObject.isUnderwater
         crossedWater = true        
+    else
+        crossedWater = false
     end
+    lastUnderwater = physicsObject.isUnderwater
     
     -- Check if object is out of bounds -- should be done after water threshold crossing was detected
     local isOOB = checkOutOfBounds()

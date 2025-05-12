@@ -62,11 +62,12 @@ end
 
 local maxAttackReached = false
 I.AnimationController.addTextKeyHandler(nil, function(groupname, key)
+    --print("Animation event", groupname, "Key", key)
     events:emit(groupname, key)
     if key:match(" min attack$") then maxAttackReached = false end
     if key:match(" max attack$") then maxAttackReached = true end
     if key:match(" hit$") and not key:match(" min hit$") then 
-        print(groupname,key,maxAttackReached)
+        --print(groupname,key,maxAttackReached)
         onHitKey:emit(groupname, key, maxAttackReached)        
     end
 end)

@@ -151,8 +151,10 @@ end
 local function removeObject(obj)
     objectsToRemove[obj.id] = obj
     local physObj = physObjectsMap[obj.id] 
-    removeFromGrid(physObj)
-    physObjectsMap[obj.id] = nil
+    if physObj then
+        removeFromGrid(physObj)
+        physObjectsMap[obj.id] = nil
+    end
     --obj:remove()
 end
 

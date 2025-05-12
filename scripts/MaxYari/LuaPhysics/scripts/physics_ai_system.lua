@@ -74,30 +74,36 @@ local function isDetectedBy(culprit, npc)
     else
         detected = sneakStatDetectionCheck(culprit, npc)
     end
-
+    
     return detected, rayWasCast
 end
 
 local function runDistributedDetection(c)
+    
     local detectedBy
     local rayCasts = 0
 
-    local function doDetectionOnce(npcs)
+    local function doDetectionOnce(npcs)        
         if #npcs == 0 then return end
         if detectedBy then return end
+        
+        local randI = math.random(1,#npcs)
         
         local randomNpc = table.remove(npcs, math.random(1,#npcs))
         
         local detected, rayWasCast = isDetectedBy(c.culprit, randomNpc)
+        
         if detected then detectedBy = randomNpc end
+        
         if rayWasCast then rayCasts = rayCasts + 1 end        
     end
 
-    while rayCasts <= maxDetectionRaysPerFrame and (#c.owner > 0 or #c.factionMembers > 0 or #c.guards > 0) do
-        doDetectionOnce(c.owner)        
-        doDetectionOnce(c.factionMembers)       
-        doDetectionOnce(c.guards)        
-    end
+    while rayCasts <= maxDetectionRaysPerFrame and (#c.owner > 0 or #c.factionMembers > 0 or #c.guards > 0) do        
+        doDetectionOnce(c.owner)
+        doDetectionOnce(c.factionMembers)
+        doDetectionOnce(c.guards)      
+        if detectedBy then break end
+    end    
     
     if detectedBy then
         c.detectedBy = detectedBy                
