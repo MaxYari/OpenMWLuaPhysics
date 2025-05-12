@@ -32,7 +32,86 @@ Enable LuaPhysicsEngine.omwscripts in the Launcher
 
 ### How to use
 
-Drag items around by holding X (if it doesnt work - check script setting and bind the input at the very bottom of the settings page). While dragging - press LMB to throw.
+Set up a key bind for dragging items around in settings->scripts->LuaPhysics. Drag items around by holding that key. While dragging - press your attack key to throw.
+
+### Developer API
+
+Every item in a game is physics-enabeld by default. 
+
+Local script of that object exposes the LuaPhysics interface
+
+```Lua
+local I = require('openmw.interfaces')
+local physObject = I.LuaPhysics.physicsObject
+```
+
+`physObject` is a representation of a physics object which drives this gameObject. Through this instance you have access to all the physics object properties and functions. See `PhysicsObject.lua` for a full list. Most likely you would want to use the following methods:
+
+```Lua
+physObject:applyImpulse(impulse, culprit)
+-- Applies a vec3 impulse to an object instantly altering it's velocity. Culprit is a gameobject (NPC) responsible for this impulse application - culprit is used by the crime detections system. If necessary - it's probably safe to set it to nil.
+physObject:updateProperties(properties)
+-- properties is a table of properties mathing property keys found on an instance of physObject (see physicsObject:new() in PhysicsObject.lua for a list of possible properties). It's HIGHLY recommended to use this method to update object's physical properties, instead of setting them directly on an instance. Properties you might be interested in are:
+weight: number, -- Initially weights is determined automatically, but can be overriden using this property
+bounce: number -- 0 - 1: how bouncy is this object?
+--
+-- Some properties of the physObject that you might want to read:
+physObject.velocity  -- vec3 currently velocity of the physics object
+physObject.isSleeping -- if true - object is in a sleep state, its not being simulated, unless acted upon by a player or hit by another object, every object starts in a sleeping state
+```
+
+Same methods can be triggered by sending an openmw event to a gameObject on which `PhysicsEngineLocal.lua` is running, such as:
+```Lua
+object:sendEvent("LuaPhysics_ApplyImpulse",{
+    impulse = impulse,
+    culprit = culprit
+})
+-- To trigger an applyImpulse method on an object (if such an object is a physics object)
+-- See eventHandlers of PhysicsEngineLocal.lua for a full list of events. As a general rule all events are names "LuaPhysics_EventName" 
+```
+
+If you want to remove a physicsObject from the world - it's paramount to use a special global event for that, instead of gameObject:remove() :
+```Lua
+core.sendGlobalEvent("LuaPhysics_RemoveObject",{
+    object = gameObject
+})
+```
+
+This will ensure that correct cleanup procedures are executed.
+
+Additionally you might want to catch collision events.
+_Every_ object, even non-physics ones - will receive collision events through the openmw event system. The regular way of catching such events applies:
+```Lua
+eventHandlers = {
+    LuaPhysics_CollidingWithPhysObj = function(eData)
+        eData.other -- This is a serialised data of a physics object which triggered the collision, it's a read-only data, no changes to this data will affect the original physics object
+    end
+}
+hitResult.hitObject:sendEvent(D.e.CollidingWithPhysObj, {other = self:serialize()})
+```
+
+More importantly a set of custom event exposed on a `I.LuaPhysics.physicsObject`, note that those are _NOT_ a part of an OpenMW event system. They are only accessible from a local script throug the exposed inteface:
+
+```Lua
+local physObject = I.LuaPhysics.physicsObject
+
+local function onCollision(collisionData)
+    -- Following fields are available on collisionData
+    collisionData.hitPos
+    collisionData.hitObject
+    collisionData.hitNormal
+    collisionData.hitPhysObject --If collided with another physics object - this will be a serialised data of that other physics object, again - changing this serialised data will not affect another physics object in any way
+end
+
+physObject.onCollision:addEventHandler(onCollision)
+physObject.onPhysObjectCollision:addEventHandler(onCollision)
+     
+```
+
+You might also want to attach a handler to `physObject.onIntersection` - this event supposed to trigger in cases when physicsObject passes through another object without triggering a collision, such as an object spawned inside a collider of another object and passing through from withing onto the outside. That was the intent, but to my knowledge this event is never triggered and from-within passing through a collider is not even possible.
+
+If you want to physics-enable other object types (e.g a Container type) - assign `PhysicsEngineLocal.lua` to that type via your `.omwscripts` mod file. Note that default config of the physics object works only with collider-less game objects (those objects don't have a grid around them when tcb console command is active). It is possible to use `PhysicsEngineLocal.lua` with collider objects, but that support is experimental and is slower than the default. To enable it - in a local script of such object set `physObject.collisionMode = "aabb" (default is "sphere")`.
+
 
 ### Credits
 
