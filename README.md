@@ -111,6 +111,8 @@ You might also want to attach a handler to `physObject.onIntersection` - this ev
 
 If you want to physics-enable other object types (e.g a Container type) - assign `PhysicsEngineLocal.lua` to that type via your `.omwscripts` mod file. Note that default config of the physics object works only with collider-less game objects (those objects don't have a grid around them when tcb console command is active). It is possible to use `PhysicsEngineLocal.lua` with collider objects, but that support is experimental and is slower than the default. To enable it - in a local script of such object set `physObject.collisionMode = "aabb" (default is "sphere")`.
 
+Destructible objects are also supported given one provides appropriate destroyed object chunk meshes - I currently don't feel like describing that system, so if you are interested in using it - look at `PhysicsDestructibleGlobal.lua` and `meshes\debris` folder. In short - if theres a collection of debri meshes matching specifi object's mesh name - then this object will be destructible. `I.LuaPhysicsDestructibles.onPreFracture` event emitter can be used to get notified and to control destructibility of specific objects (e.g to prevent an object from being destroying, even though it has debri meshes).
+
 
 ### Credits
 
