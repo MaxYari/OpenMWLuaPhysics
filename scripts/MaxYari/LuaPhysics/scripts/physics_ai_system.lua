@@ -263,7 +263,7 @@ local function reportCrime(objectOrPrice, culprit, witness, isDestroyed)
     local type = types.Player.OFFENSE_TYPE.Pickpocket
     --if isDestroyed then type = types.Player.OFFENSE_TYPE.Assault end
 
-    --print("Reporting crime",price,witness)
+    print("Reporting crime",price,witness)
     crimes.commitCrime(culprit, {
         arg = price,
         faction = factionId,

@@ -20,7 +20,7 @@ local crimeSystemActive = settings:get("CrimeSystemActive")
 
 -- Defines -----------------
 local frame = 0
-PhysSoundSystem.masterVolume = 2
+PhysSoundSystem.masterVolume = 2 * settings:get("SFXVolume")
 
 local physObjectsMap = {}
 local objectsToRemove = {}

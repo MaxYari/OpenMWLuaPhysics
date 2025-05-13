@@ -7,6 +7,7 @@ I.Settings.registerGroup {
     page = 'LuaPhysicsPage',
     l10n = 'LuaPhysics',
     name = 'General Settings',
+    order = 2,
     permanentStorage = true,    
     settings = {
         {
@@ -45,6 +46,16 @@ I.Settings.registerGroup {
             name = "Crime System Active",
             description = "Messing around too much with owned items, destroying them, or destroying too many non-owned items under a vigilant watch of a guard - will be treated as a crime."
         },
+        {
+            key="SFXVolume",
+            renderer = "number",
+            default = 1,
+            argument = {
+                min = 0,
+                max = 10
+            },
+            name = "Sound Effects Volume"            
+        }
     },
 }
 
@@ -54,6 +65,7 @@ I.Settings.registerGroup {
     l10n = 'LuaPhysics',
     name = 'Auxiliary',
     permanentStorage = true,    
+    order = 3,
     settings = {
         {
             key = 'NoCollisionOnShift',

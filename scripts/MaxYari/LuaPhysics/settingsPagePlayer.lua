@@ -13,7 +13,7 @@ I.Settings.registerPage {
     key = 'LuaPhysicsPage',
     l10n = 'LuaPhysics',
     name = 'Lua Physics Engine',
-    description = '<< A Funky Lua Physics Engine by Max Yari >>',
+    description = '<< A Funky Lua Physics Engine by Max Yari >> Some settings here are not applied in realtime. Execute a "reloadlua" command in ~ tilda console or restart the game to apply the settings.',
 }
 
 I.Settings.registerGroup {
@@ -21,7 +21,8 @@ I.Settings.registerGroup {
     page = 'LuaPhysicsPage',
     l10n = 'LuaPhysics',
     name = 'Controls',
-    permanentStorage = true,    
+    permanentStorage = true,   
+    order = 1,
     settings = {
         {
             key = "GrabPhysicsObjectButton",

@@ -39,8 +39,11 @@ local function getCleanName(modelPath)
     return cleanName
 end
 
+
+
 -- Build debris map at startup
 local function buildDebrisMap()
+    --print("Building debris map")
     for filePath in vfs.pathsWithPrefix("meshes/debris") do
         if filePath:find("%.nif$") then
             local fileName = getCleanName(filePath)
@@ -63,6 +66,7 @@ local function buildDebrisMap()
                 if not debrisMap[meshName] then
                     debrisMap[meshName] = {}
                 end
+                --print("Checking debris map for", meshName, filePath)
                 if not debrisMap[meshName][filePath] then
                     if not recordId then
                         -- No record for that filePath yet
@@ -75,6 +79,7 @@ local function buildDebrisMap()
                     end
                     --print("Adding record",recordId,"to debris map mesh name",meshName)
                     debrisMap[meshName][filePath] = recordId
+                    --print("Adding debris map entry", meshName, filePath, recordId)
                 end
             end
         end
@@ -383,9 +388,12 @@ local function onSave()
 end
 
 local function onLoad(data)
-    if not data then return end
-    print("OnLoad, debris map:", data.debrisMap)
-    debrisMap = data.debrisMap or {}
+    --print("Destructibe OnLoad/OnInit")
+    if data and data.debrisMap then
+        --print("Found debris map, assigning", data.debrisMap)
+        --print("OnLoad, debris map:", data.debrisMap)
+        debrisMap = data.debrisMap
+    end
     buildDebrisMap()    
 end
 
@@ -393,6 +401,7 @@ return {
     engineHandlers = {
         onSave = onSave,
         onLoad = onLoad,
+        onInit = onLoad,
         onUpdate = onUpdate
     },
     eventHandlers = {
