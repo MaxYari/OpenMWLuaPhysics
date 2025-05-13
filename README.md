@@ -2,13 +2,21 @@
 
 ![alt text](images/Physics2.gif)
 
+[Watch Video Demo Here](https://youtu.be/5klixjQGopU)
+
 ## Lua Physics for OpenMW
 
 A deranged mod that implements a somewhat simple and naive physics engine in pure lua and exposes a rich interface for developers.
 
 Think Half-Life 1 level of physics, maybe a bit better.
 
-Apart from being mostly developer-centered api this mod also enables physics all of the items in the game (things you can put in you inventory). You can drag them around, throw them and break bottles. But be warned - messing around with someone's property too much - will not be tolerated (if noticed, which depends on your sneak skill, proximity and sheer luck)
+Apart from being mostly developer-centered API - this mod also enables physics all of the items in the game (things you can put in you inventory). You can drag them around, throw them and break bottles. But be warned - messing around with someone's property too much - will not be tolerated (if noticed, which depends on your sneak skill, proximity and sheer luck)
+
+### Credits
+
+Sound Effects: Sound effects were recorded, scavenged from freesound.org or otherwise produced by [NimSound](https://nimsound.ru/) and myself. Additionally a sound library "Lesser Vibes" by Sergey Eybog was used.
+
+Separate thanks to [taitechnic](https://next.nexusmods.com/profile/taitechnic/mods) for exposing a series of convenient interface functions from OpenMW Impact Effects and helping with visual effects.
 
 ### Installation
 
@@ -16,9 +24,10 @@ Apart from being mostly developer-centered api this mod also enables physics all
 
 Install dependencies:
 [OpenMW Impact Effects](https://www.nexusmods.com/morrowind/mods/55508)
+Highly recommended, but probably not required.
 
 ---
-Download repository, drop the archive into Mod Organiser 2
+Use Mod Organiser 2 - if you downloaded mod archive manually (e.g from Git) - drag-n-drop it into the Mod Organiser 2
 
 Or, if you want to install manually:
 
@@ -32,9 +41,13 @@ Enable LuaPhysicsEngine.omwscripts in the Launcher
 
 ### How to use
 
-Set up a key bind for dragging items around in settings->scripts->LuaPhysics. Drag items around by holding that key. While dragging - press your attack key to throw.
+Set up a key bind for dragging items around in settings->scripts->LuaPhysics. Drag items around by holding that key. While dragging - press attack key to throw. Hitting items with a weapon or fists will send them flying or even break some of them (some bottles).
+
+Ranged attacks or spells currently DO NOT AFFECT physics objects, since there no OpenMW api exposed yet to manage those. Actors moving through stationary physics objects also will not affect them.
 
 ### Developer API
+
+Apart from playing around with physics items - primary purpose of this mod is to expose a set of methods that other developers can use to implement physics-based mods.
 
 Every item in a game is physics-enabeld by default. 
 
@@ -113,11 +126,9 @@ If you want to physics-enable other object types (e.g a Container type) - assign
 
 Destructible objects are also supported given one provides appropriate destroyed object chunk meshes - I currently don't feel like describing that system, so if you are interested in using it - look at `PhysicsDestructibleGlobal.lua` and `meshes\debris` folder. In short - if theres a collection of debri meshes matching specifi object's mesh name - then this object will be destructible. `I.LuaPhysicsDestructibles.onPreFracture` event emitter can be used to get notified and to control destructibility of specific objects (e.g to prevent an object from being destroying, even though it has debri meshes).
 
+This is hopefully enough info to implement practically anything. Its totally possible that I've made a crytical typo here or there or forgot to mention something. In that case I can only suggest looking into the source files.
 
-### Credits
 
-Sound Effects: Sound effects were recorded, scavenged from freesound.org or otherwise produced by [NimSound](https://nimsound.ru/) and myself. Additionally a sound library "Lesser Vibes" by Sergey Eybog was used.
 
-Separate thanks to [taitechnic](https://next.nexusmods.com/profile/taitechnic/mods) for exposing a series of convenient interface functions from OpenMW Impact Effects
 
 
