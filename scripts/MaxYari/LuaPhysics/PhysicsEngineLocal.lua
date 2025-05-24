@@ -209,13 +209,21 @@ local function onLoad(data)
     physicsObject:loadPersistentData(data.physicsObjectPersistentData)
 end
 
+local function onInactive(data)
+    print("Object", omwself.recordId, "is inactive")
+    core.sendGlobalEvent(D.e.InactivationReport, {
+        object = omwself
+    })
+end
+
 
 
 return {
     engineHandlers = {
         onUpdate = onUpdate,
         onSave = onSave,
-        onLoad = onLoad
+        onLoad = onLoad,
+        onInactive = onInactive
     },
     eventHandlers = {
         [D.e.MoveTo] = function(e)

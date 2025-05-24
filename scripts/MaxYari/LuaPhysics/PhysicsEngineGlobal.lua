@@ -35,6 +35,7 @@ local function getGridCellCoord(position)
 end
 
 local function updateInGrid(physObject)
+    --print("Putting object into grid")
     local lastGridCell = physObject.gridCell
     local id = physObject.object.id
     if lastGridCell then lastGridCell[id] = nil end
@@ -56,10 +57,13 @@ local function updateInGrid(physObject)
     physObject.gridCell = gridCell
 end
 
-local function removeFromGrid(physObject)
-    if not physObject.gridCell then return end
-    --print("Removing",physObject.object,"from cell",physObject.gridCell)
-    physObject.gridCell[physObject.object.id] = nil
+local function removeFromGrid(obj)
+    --print("Removing object from grid",obj)
+    local physObj = physObjectsMap[obj.id] 
+    if physObj then
+        if physObj.gridCell then physObj.gridCell[physObj.object.id] = nil end
+        physObjectsMap[obj.id] = nil
+    end
 end
 
 local function serialize(physObject) 
@@ -74,6 +78,8 @@ local function serialize(physObject)
     }
 end
 
+-- TO DO: Sleepers shouldnt be checked at all, probably should have their own grid object? But non-sleepers should be checked against sleepers
+-- TO DO: Unloaded objects should be removed from the grid - event should be sent from onInactive
 local function checkCollisionsInGrid()    
     local alreadyChecked = {}    
     for cellX, cellYs in pairs(grid) do        
@@ -113,7 +119,8 @@ local function onPhysObjPropsUpdate(props)
     end
     local prevSleepState = physObj.isSleeping
     gutils.shallowMergeTables(physObj, props)
-    --print("Updated phys obj",physObj.object,"with props",gutils.tableToString(props))
+    --print("Updated phys obj",physObj.object)
+    --print("with props",gutils.tableToString(props))
     if doSelfCollisions and not physObj.ignorePhysObjectCollisions then
         if physObj.position then updateInGrid(physObj) end
     end
@@ -150,11 +157,7 @@ end
 
 local function removeObject(obj)
     objectsToRemove[obj.id] = obj
-    local physObj = physObjectsMap[obj.id] 
-    if physObj then
-        removeFromGrid(physObj)
-        physObjectsMap[obj.id] = nil
-    end
+    removeFromGrid(obj)
     --obj:remove()
 end
 
@@ -199,6 +202,9 @@ return {
         [D.e.UpdateVisPos] = handleUpdateVisPos,
         [D.e.PhysPropUpdReport] = function (data)
             onPhysObjPropsUpdate(data)
+        end,
+        [D.e.InactivationReport] = function (data)
+            removeFromGrid(data.object)
         end,
         [D.e.RemoveObject] = function(data)
             removeObject(data.object)

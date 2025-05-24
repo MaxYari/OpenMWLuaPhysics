@@ -18,6 +18,7 @@ return {
         ApplyImpulse = prefix.."ApplyImpulse",
         SetPhysicsProperties = prefix.."SetPhysicsProperties",
         PhysPropUpdReport = prefix.."PhysPropUpdReport",
+        InactivationReport = prefix.."InactivationReport",
         SetMaterial = prefix.."SetMaterial",
         SetPositionUnadjusted = prefix.."SetPositionUnadjusted",
         CollidingWithPhysObj = prefix.."CollidingWithPhysObj",
