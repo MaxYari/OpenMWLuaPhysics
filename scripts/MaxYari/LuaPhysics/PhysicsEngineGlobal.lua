@@ -28,38 +28,33 @@ local objectsToRemove = {}
 
 -- Grid collision system for dynamic objects ----------------------------------------------
 -------------------------------------------------------------------------------------------
-local grid = {}
+local grid_awake = {}
+local grid_sleeping = {}
 local gridSize = 150
 local function getGridCellCoord(position)
     return math.floor(position.x / gridSize), math.floor(position.y / gridSize), math.floor(position.z / gridSize)
 end
 
 local function updateInGrid(physObject)
-    --print("Putting object into grid")
+    -- Remove from previous grid cell if needed
     local lastGridCell = physObject.gridCell
-    local id = physObject.object.id
-    if lastGridCell then lastGridCell[id] = nil end
-    
+    if lastGridCell then lastGridCell[physObject.object.id] = nil end
+
+    -- Choose grid based on sleep state
+    local grid = physObject.isSleeping and grid_sleeping or grid_awake
+
     local cellX, cellY, cellZ = getGridCellCoord(physObject.position)
-    --local cellKey = string.format("%d,%d,%d", cellX, cellY, cellZ)
-    if not grid[cellX] then
-        grid[cellX] = {}
-    end
-    if not grid[cellX][cellY] then
-        grid[cellX][cellY] = {}
-    end
+    if not grid[cellX] then grid[cellX] = {} end
+    if not grid[cellX][cellY] then grid[cellX][cellY] = {} end
+    if not grid[cellX][cellY][cellZ] then grid[cellX][cellY][cellZ] = {} end
     local gridCell = grid[cellX][cellY][cellZ]
-    if not gridCell then
-        gridCell = {}
-        grid[cellX][cellY][cellZ] = gridCell
-    end
-    gridCell[id] = physObject
+    gridCell[physObject.object.id] = physObject
     physObject.gridCell = gridCell
+    physObject.gridType = physObject.isSleeping and "sleeping" or "awake"
 end
 
 local function removeFromGrid(obj)
-    --print("Removing object from grid",obj)
-    local physObj = physObjectsMap[obj.id] 
+    local physObj = physObjectsMap[obj.id]
     if physObj then
         if physObj.gridCell then physObj.gridCell[physObj.object.id] = nil end
         physObjectsMap[obj.id] = nil
@@ -80,21 +75,34 @@ end
 
 -- TO DO: Sleepers shouldnt be checked at all, probably should have their own grid object? But non-sleepers should be checked against sleepers
 -- TO DO: Unloaded objects should be removed from the grid - event should be sent from onInactive
-local function checkCollisionsInGrid()    
-    local alreadyChecked = {}    
-    for cellX, cellYs in pairs(grid) do        
-        for cellY, cellZs in pairs(grid[cellX]) do            
-            for cellZ, objects in pairs(grid[cellX][cellY]) do           
-                for id, physObj1 in pairs(objects) do
-                    for id, physObj2 in pairs(objects) do                        
-                        if physObj1.object == physObj2.object or alreadyChecked[physObj2] then goto continue end
-                        if physObj1.isSleeping and physObj2.isSleeping then goto continue end
+local function collidePhysObjects(physObj1, physObj2)
+    physObj1.object:sendEvent(D.e.CollidingWithPhysObj, { other = serialize(physObj2) })
+    physObj2.object:sendEvent(D.e.CollidingWithPhysObj, { other = serialize(physObj1) })
+end
+local function checkCollisionsInGrid()
+    local alreadyChecked = {}
+    for cellX, cellYs in pairs(grid_awake) do
+        for cellY, cellZs in pairs(cellYs) do
+            for cellZ, awakeObjects in pairs(cellZs) do
+                -- Get corresponding sleeping cell (may be nil)
+                local sleepingObjects = (grid_sleeping[cellX] and grid_sleeping[cellX][cellY] and grid_sleeping[cellX][cellY][cellZ]) or {}
+
+                -- Check awake vs awake
+                for id1, physObj1 in pairs(awakeObjects) do
+                    for id2, physObj2 in pairs(awakeObjects) do
+                        if physObj1.object == physObj2.object or alreadyChecked[physObj2] then goto continue_awake end
                         if PhysicsObject.isCollidingWith(physObj1, physObj2) then
-                            --print("2 objects colliding, here they are",gutils.tableToString(physObj1),gutils.tableToString(physObj2))
-                            physObj1.object:sendEvent(D.e.CollidingWithPhysObj, { other = serialize(physObj2) })
-                            physObj2.object:sendEvent(D.e.CollidingWithPhysObj, { other = serialize(physObj1) })
+                            collidePhysObjects(physObj1, physObj2)
                         end
-                        ::continue::
+                        ::continue_awake::
+                    end
+                    -- Check awake vs sleeping
+                    for id2, physObj2 in pairs(sleepingObjects) do
+                        --if physObj1.object == physObj2.object then goto continue_sleeping end
+                        if PhysicsObject.isCollidingWith(physObj1, physObj2) then
+                            collidePhysObjects(physObj1, physObj2)
+                        end
+                        ::continue_sleeping::
                     end
                     alreadyChecked[physObj1] = true
                 end
@@ -117,10 +125,10 @@ local function onPhysObjPropsUpdate(props)
         physObj = {}
         physObjectsMap[id] = physObj
     end
-    local prevSleepState = physObj.isSleeping
+    
     gutils.shallowMergeTables(physObj, props)
-    --print("Updated phys obj",physObj.object)
-    --print("with props",gutils.tableToString(props))
+    -- Move between grids if sleep state changed
+    
     if doSelfCollisions and not physObj.ignorePhysObjectCollisions then
         if physObj.position then updateInGrid(physObj) end
     end
@@ -137,7 +145,11 @@ local function handleUpdateVisPos(pObjData)
     if objectsToRemove[object.id] then return end
         
     local physObj = physObjectsMap[object.id]
-    if not physObj or not physObj.initialized then return end
+    if not physObj or not physObj.initialized then
+        --[[ print("ignoring ",physObj)
+        if physObj then print("Since not initialised",physObj.initialized) end ]]
+        return 
+    end
     
     if not physObj.origin then
         print("WARNING WARNING, physics object without origin!")
@@ -158,7 +170,6 @@ end
 local function removeObject(obj)
     objectsToRemove[obj.id] = obj
     removeFromGrid(obj)
-    --obj:remove()
 end
 
 

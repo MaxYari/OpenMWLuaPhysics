@@ -191,6 +191,7 @@ function PhysicsObject:serialize()
         bounce = self.bounce,
         mass = self.mass,
         culprit = self.culprit,
+        initialized = self.initialized,
         ignorePhysObjectCollisions = self.ignorePhysObjectCollisions
     }
 end
