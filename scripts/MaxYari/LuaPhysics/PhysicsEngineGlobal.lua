@@ -1,3 +1,4 @@
+-- PhysicsEngineGlobal.lua
 local mp = 'scripts/MaxYari/LuaPhysics/'
 
 local world = require('openmw.world')
@@ -14,35 +15,25 @@ local settings = storage.globalSection('SettingsLuaPhysics')
 local doSelfCollisions = settings:get("SelfCollisions")
 local crimeSystemActive = settings:get("CrimeSystemActive")
 
-
--- local physicsObjectScript = mp.."PhysicsEngineLocal.lua"
--- if true then return end
-
--- Defines -----------------
 local frame = 0
 PhysSoundSystem.masterVolume = 2 * settings:get("SFXVolume")
 
 local physObjectsMap = {}
 local objectsToRemove = {}
 
-
--- Grid collision system for dynamic objects ----------------------------------------------
--------------------------------------------------------------------------------------------
 local grid_awake = {}
 local grid_sleeping = {}
 local gridSize = 150
+
 local function getGridCellCoord(position)
     return math.floor(position.x / gridSize), math.floor(position.y / gridSize), math.floor(position.z / gridSize)
 end
 
 local function updateInGrid(physObject)
-    -- Remove from previous grid cell if needed
     local lastGridCell = physObject.gridCell
     if lastGridCell then lastGridCell[physObject.object.id] = nil end
 
-    -- Choose grid based on sleep state
     local grid = physObject.isSleeping and grid_sleeping or grid_awake
-
     local cellX, cellY, cellZ = getGridCellCoord(physObject.position)
     if not grid[cellX] then grid[cellX] = {} end
     if not grid[cellX][cellY] then grid[cellX][cellY] = {} end
@@ -73,21 +64,18 @@ local function serialize(physObject)
     }
 end
 
--- TO DO: Sleepers shouldnt be checked at all, probably should have their own grid object? But non-sleepers should be checked against sleepers
--- TO DO: Unloaded objects should be removed from the grid - event should be sent from onInactive
 local function collidePhysObjects(physObj1, physObj2)
     physObj1.object:sendEvent(D.e.CollidingWithPhysObj, { other = serialize(physObj2) })
     physObj2.object:sendEvent(D.e.CollidingWithPhysObj, { other = serialize(physObj1) })
 end
+
 local function checkCollisionsInGrid()
     local alreadyChecked = {}
     for cellX, cellYs in pairs(grid_awake) do
         for cellY, cellZs in pairs(cellYs) do
             for cellZ, awakeObjects in pairs(cellZs) do
-                -- Get corresponding sleeping cell (may be nil)
                 local sleepingObjects = (grid_sleeping[cellX] and grid_sleeping[cellX][cellY] and grid_sleeping[cellX][cellY][cellZ]) or {}
 
-                -- Check awake vs awake
                 for id1, physObj1 in pairs(awakeObjects) do
                     for id2, physObj2 in pairs(awakeObjects) do
                         if physObj1.object == physObj2.object or alreadyChecked[physObj2] then goto continue_awake end
@@ -96,9 +84,7 @@ local function checkCollisionsInGrid()
                         end
                         ::continue_awake::
                     end
-                    -- Check awake vs sleeping
                     for id2, physObj2 in pairs(sleepingObjects) do
-                        --if physObj1.object == physObj2.object then goto continue_sleeping end
                         if PhysicsObject.isCollidingWith(physObj1, physObj2) then
                             collidePhysObjects(physObj1, physObj2)
                         end
@@ -110,13 +96,6 @@ local function checkCollisionsInGrid()
         end
     end
 end
----------------------------------------------------------------------------------------------------------
----------------------------------------------------------------------------------------------------------
-
-
-
--- Moving objects and checking grid-optimised collisions with other physics objects -------------------
----------------------------------------------------------------------------------------------------------
 
 local function onPhysObjPropsUpdate(props)
     local id = props.object.id
@@ -127,27 +106,19 @@ local function onPhysObjPropsUpdate(props)
     end
     
     gutils.shallowMergeTables(physObj, props)
-    -- Move between grids if sleep state changed
-    
     if doSelfCollisions and not physObj.ignorePhysObjectCollisions then
         if physObj.position then updateInGrid(physObj) end
     end
 end
 
 local function handleUpdateVisPos(pObjData)
-    
-    -- print("Global received teleport request from",d.object,"At frame",frame)
     local object = pObjData.object
     local cell = object.cell
 
-    -- print("Upd vis pos on ",object,cell)
-
     if objectsToRemove[object.id] then return end
-        
+    
     local physObj = physObjectsMap[object.id]
     if not physObj or not physObj.initialized then
-        --[[ print("ignoring ",physObj)
-        if physObj then print("Since not initialised",physObj.initialized) end ]]
         return 
     end
     
@@ -157,9 +128,6 @@ local function handleUpdateVisPos(pObjData)
     end
     local position = pObjData.position - pObjData.rotation:apply(physObj.origin)
     local rotation = pObjData.rotation
-
-    --local isChunk5 = string.find(object.type.record(object).model:lower(),"misc_com_bottle__chunk_5")
-    --if isChunk5 then print("Chunk 5 teleport request", pObjData.position) end
     
     if object and object.count > 0 and cell ~= nil then
         object:teleport(cell, position, { rotation = rotation })
@@ -172,19 +140,12 @@ local function removeObject(obj)
     removeFromGrid(obj)
 end
 
-
-
--- onUpdate ----- 
------------------
 local function onUpdate(dt)
-    --print("Global Onupdate frame", frame)
     frame = frame + 1
 
-    -- refetch settings
     doSelfCollisions = settings:get("SelfCollisions")
     crimeSystemActive = settings:get("CrimeSystemActive")
 
-    -- removal of scheduled objects
     for id, obj in pairs(objectsToRemove) do
         obj:remove()
     end
@@ -202,8 +163,6 @@ local function onUpdate(dt)
         PhysAiSystem.update()
     end
 end
-
-
 
 return {
     engineHandlers = {
@@ -250,6 +209,35 @@ return {
         [D.e.DetectCulpritResult] = function(...)
             if not crimeSystemActive then return end
             PhysAiSystem.onDetectCulpritResult(...)
+        end,
+        ["DropItem"] = function(data)
+            local newObject = data.object
+            print("Initializing physics for dropped item", newObject.recordId, "at position", newObject.position)
+            local mat = PhysMatSystem.getMaterialFromObject(newObject)
+            print("Material:", mat)
+            newObject:sendEvent(D.e.SetMaterial, { material = mat})
+            newObject:sendEvent(D.e.SetPhysicsProperties, {
+                drag = 0.08,
+                bounce = 1.2,
+                isSleeping = false,
+                culprit = data.culprit,
+                mass = 1.2,
+                buoyancy = 0.3,
+                lockRotation = false,
+                angularDrag = 0.20,
+                resetOnLoad = false,
+                ignoreWorldCollisions = false,
+                collisionMode = "sphere",
+                realignWhenRested = false
+            })
+            newObject:sendEvent(D.e.SetPositionUnadjusted, {position = newObject.position})
+            local randomHorizontal = util.vector3(
+                (math.random() - 0.5) * 16,
+                (math.random() - 0.5) * 16,
+                -200
+            )
+            newObject:sendEvent(D.e.ApplyImpulse, {impulse = randomHorizontal, culprit = data.culprit})
+            print("Applied impulse, physics initialized")
         end
     },
     interfaceName = "LuaPhysics",
