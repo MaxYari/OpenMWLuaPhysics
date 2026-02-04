@@ -250,6 +250,35 @@ return {
         [D.e.DetectCulpritResult] = function(...)
             if not crimeSystemActive then return end
             PhysAiSystem.onDetectCulpritResult(...)
+        end,
+        ["DropItem"] = function(data)
+            local newObject = data.object
+            print("Initializing physics for dropped item", newObject.recordId, "at position", newObject.position)
+            local mat = PhysMatSystem.getMaterialFromObject(newObject)
+            print("Material:", mat)
+            newObject:sendEvent(D.e.SetMaterial, { material = mat})
+            newObject:sendEvent(D.e.SetPhysicsProperties, {
+                drag = 0.08,
+                bounce = 1.2,
+                isSleeping = false,
+                culprit = data.culprit,
+                mass = 1.2,
+                buoyancy = 0.3,
+                lockRotation = false,
+                angularDrag = 0.20,
+                resetOnLoad = false,
+                ignoreWorldCollisions = false,
+                collisionMode = "sphere",
+                realignWhenRested = false
+            })
+            newObject:sendEvent(D.e.SetPositionUnadjusted, {position = newObject.position})
+            local randomHorizontal = util.vector3(
+                (math.random() - 0.5) * 16,
+                (math.random() - 0.5) * 16,
+                -200
+            )
+            newObject:sendEvent(D.e.ApplyImpulse, {impulse = randomHorizontal, culprit = data.culprit})
+            print("Applied impulse, physics initialized")
         end
     },
     interfaceName = "LuaPhysics",
