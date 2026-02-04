@@ -405,18 +405,34 @@ function PhysicsObject:update(dt)
 
         if not self.ignoreWorldCollisions then
             if self.collisionMode == "sphere" then
-                hitResult = nearby.castRay(rayStart, rayEnd, { radius = self.radius })
+                -- Use numeric bitmask 63 (AnyPhysical: World+Door+Actor+HeightMap+Projectile+Water)
+                hitResult = nearby.castRay(rayStart, rayEnd, { 
+                    radius = self.radius,
+                    collisionType = 63
+                })
             elseif self.collisionMode == "aabb" then
-                hitResult = phUtils.customRaycastAABB(rayStart, rayEnd, self.radius, self.object:getBoundingBox(), self.rotation, { ignore = self.object })
+                hitResult = phUtils.customRaycastAABB(rayStart, rayEnd, self.radius, self.object:getBoundingBox(), self.rotation, { ignore = self.object, collisionType = 63 })
             end
 
             if hitResult and hitResult.hit then
-                collided = self:handleCollision(hitResult)
-                if self.collisionMode == "sphere" then
-                    -- Update position on collision to get close to a surface without penetrating
-                    if collided then self.position = phUtils.calcSpherePosAtHit(self.position, displacement, hitResult.hitPos, self.radius) end
-                elseif self.collisionMode == "aabb" then
-                    -- Dont update position on collision, to ensure no penetration
+                local isHitValid = true
+                if self.collisionFilter then
+                    isHitValid = self.collisionFilter(hitResult)
+                end
+                
+                if isHitValid then
+                    collided = self:handleCollision(hitResult)
+                    if self.collisionMode == "sphere" then
+                        -- Update position on collision to get close to a surface without penetrating
+                        if collided then self.position = phUtils.calcSpherePosAtHit(self.position, displacement, hitResult.hitPos, self.radius) end
+                    elseif self.collisionMode == "aabb" then
+                        -- Dont update position on collision, to ensure no penetration
+                    end
+                else
+                    -- Filter rejected this hit (e.g. ghost air above dead actor)
+                    -- We act as if no hit occurred so displacement can continue.
+                    hitResult = nil
+                    collided = false
                 end
             end
         end
@@ -480,7 +496,6 @@ function PhysicsObject:trySleep(dt)
 end
 
 return PhysicsObject
-
 
 
 

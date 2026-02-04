@@ -8,6 +8,7 @@ local vfs = require('openmw.vfs')
 local nearby = require('openmw.nearby')
 
 local omwself = require('openmw.self')
+local types = require('openmw.types')
 
 local PhysicsObject = require(mp..'PhysicsObject')
 
@@ -126,8 +127,48 @@ local function checkOutOfBounds()
 end
 
 
+local function projectileCollisionFilter(hit)
+    if not hit or not hit.hitObject then return true end
+    
+    local obj = hit.hitObject
+    if obj.type == types.NPC or obj.type == types.Creature then
+        local health = types.Actor.stats.dynamic.health(obj).current
+        if health <= 0 then
+            -- Dead actor. Check height.
+            local relZ = hit.hitPos.z - obj.position.z
+            if relZ > 20 then
+                -- TOO HIGH. Ignore collision with the ghost upright capsule.
+                return false
+            end
+        end
+    end
+    return true
+end
+
+physicsObject.collisionFilter = projectileCollisionFilter
+
+
 local function onCollision(hitResult)
     tryPlayCollisionSounds(hitResult)
+    
+    -- [[ CUSTOM LUA PROJECTILE PHYSICS HOOK ]] --
+    if omwself.type == types.Weapon then
+        local record = types.Weapon.record(omwself)
+        if record and (record.type == types.Weapon.TYPE.Arrow or 
+                       record.type == types.Weapon.TYPE.Bolt or 
+                       record.type == types.Weapon.TYPE.MarksmanThrown) then
+             
+             core.sendGlobalEvent('LuaProjectilePhysics_ProjectileHit', {
+                projectile = omwself,
+                hitObject = hitResult.hitObject,
+                hitPos = hitResult.hitPos,
+                hitNormal = hitResult.hitNormal or hitResult.normal,
+                velocity = physicsObject.velocity
+             })
+        end
+    end
+    -- [[ END CUSTOM HOOK ]] --
+    
     if physicsObject.velocity:length() >= fenagledMinSpeed then
         core.sendGlobalEvent(D.e.ObjectFenagled, {
             object = omwself,
@@ -265,7 +306,6 @@ return {
     interface = {version=1.0, physicsObject=physicsObject}
     
 }
-
 
 
 
