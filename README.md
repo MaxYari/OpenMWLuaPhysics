@@ -123,7 +123,7 @@ physObject.onPhysObjectCollision:addEventHandler(onCollision)
 Additionally, recently added is a special collision callback that allows you to outright prevent a collision with this specific object
 
 ```Lua
-physObject.onPreCollision:addEventHandler(function(hitResult, collisionControl)
+physObject.onPreCollision:addEventHandler(function(collisionData, collisionControl)
   collisionControl.prevent = true
   -- This will prevent a collision with this specific object
 end)
