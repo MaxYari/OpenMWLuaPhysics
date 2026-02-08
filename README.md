@@ -120,6 +120,15 @@ physObject.onPhysObjectCollision:addEventHandler(onCollision)
      
 ```
 
+Additionally, recently added is a special collision callback that allows you to outright prevent a collision with this specific object
+
+```Lua
+physObject.onPreCollision:addEventHandler(function(hitResult, collisionControl)
+  collisionControl.prevent = true
+  -- This will prevent a collision with this specific object
+end)
+```
+
 You might also want to attach a handler to `physObject.onIntersection` - this event supposed to trigger in cases when physicsObject passes through another object without triggering a collision, such as an object spawned inside a collider of another object and passing through from withing onto the outside. That was the intent, but to my knowledge this event is never triggered and from-within passing through a collider is not even possible.
 
 If you want to physics-enable other object types (e.g a Container type) - assign `PhysicsEngineLocal.lua` to that type via your `.omwscripts` mod file. Note that default config of the physics object works only with collider-less game objects (those objects don't have a grid around them when tcb console command is active). It is possible to use `PhysicsEngineLocal.lua` with collider objects, but that support is experimental and is slower than the default. To enable it - in a local script of such object set `physObject.collisionMode = "aabb" (default is "sphere")`.
