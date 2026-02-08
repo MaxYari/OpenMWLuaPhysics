@@ -84,11 +84,11 @@ end
 module.slerpRotation = slerpRotation
 
 
-
+local centerVector = util.vector2(0.5, 0.5)
 local function GrabObject()
     local position = camera.getPosition()
-    local direction = camera.viewportToWorldVector(util.vector2(0.5, 0.5)):normalize()
-    local pickupDistance = grabDistance
+    local direction = camera.viewportToWorldVector(centerVector):normalize()
+    local pickupDistance = amera.getThirdPersonDistance() + grabDistance
     local castResult = nearby.castRenderingRay(position, position + direction * pickupDistance)
     local object = castResult.hitObject
  
