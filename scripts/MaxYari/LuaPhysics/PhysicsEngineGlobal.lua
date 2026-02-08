@@ -75,9 +75,12 @@ end
 
 -- TO DO: Sleepers shouldnt be checked at all, probably should have their own grid object? But non-sleepers should be checked against sleepers
 -- TO DO: Unloaded objects should be removed from the grid - event should be sent from onInactive
+local collisionEventPayload = {}
 local function collidePhysObjects(physObj1, physObj2)
-    physObj1.object:sendEvent(D.e.CollidingWithPhysObj, { other = serialize(physObj2) })
-    physObj2.object:sendEvent(D.e.CollidingWithPhysObj, { other = serialize(physObj1) })
+    collisionEventPayload.other = serialize(physObj2)
+    physObj1.object:sendEvent(D.e.CollidingWithPhysObj, collisionEventPayload)
+    collisionEventPayload.other = serialize(physObj1)
+    physObj2.object:sendEvent(D.e.CollidingWithPhysObj, collisionEventPayload)
 end
 local function checkCollisionsInGrid()
     local alreadyChecked = {}
@@ -134,8 +137,8 @@ local function onPhysObjPropsUpdate(props)
     end
 end
 
-local function handleUpdateVisPos(pObjData)
-    
+local teleportOpts = {}
+local function handleUpdateVisPos(pObjData)    
     -- print("Global received teleport request from",d.object,"At frame",frame)
     local object = pObjData.object
     local cell = object.cell
@@ -162,7 +165,8 @@ local function handleUpdateVisPos(pObjData)
     --if isChunk5 then print("Chunk 5 teleport request", pObjData.position) end
     
     if object and object.count > 0 and cell ~= nil then
-        object:teleport(cell, position, { rotation = rotation })
+        teleportOpts.rotation = rotation
+        object:teleport(cell, position, teleportOpts)
         onPhysObjPropsUpdate(pObjData) 
     end
 end

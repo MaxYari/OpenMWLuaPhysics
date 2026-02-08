@@ -107,7 +107,7 @@ function PhysicsObject:init(object, properties)
     self.cellBounds = nil -- Will be received later from global
     self.player = nil -- Will be received later from global
 
-    -- Events
+    -- Events    
     self.onCollision = properties.onCollision or EventsManager:new()
     self.onPhysObjectCollision = properties.onPhysObjectCollision or EventsManager:new()
     self.onIntersection = properties.onIntersection or EventsManager:new()
@@ -196,13 +196,13 @@ function PhysicsObject:serialize()
     }
 end
 
-function PhysicsObject:serializeMotionData()
-    return {
-        object = self.object,
-        position = self.position,
-        velocity = self.velocity,        
-        rotation = self.rotation
-    }
+local motionData = {} -- Avoid making new dictionaries for the sake of performance
+function PhysicsObject:serializeMotionData()    
+    motionData.object = self.object
+    motionData.position = self.position
+    motionData.velocity = self.velocity       
+    motionData.rotation = self.rotation
+    return motionData
 end
 
 function PhysicsObject:resetPosition(sleep)
@@ -212,13 +212,12 @@ function PhysicsObject:resetPosition(sleep)
     if sleep then self:sleep() end
 end
 
-function PhysicsObject:getPersistentData()
-    return {
-        initialPosition = self.initialPosition,
-        initialRotation = self.initialRotation,
-        resetOnLoad = self.resetOnLoad,
-        ignorePhysObjectCollisions = self.ignorePhysObjectCollisions
-    }
+local persistentData = {}
+function PhysicsObject:getPersistentData()    
+    persistentData.initialPosition = self.initialPosition
+    persistentData.initialRotation = self.initialRotation
+    persistentData.resetOnLoad = self.resetOnLoad
+    persistentData.ignorePhysObjectCollisions = self.ignorePhysObjectCollisions    
 end
 
 function PhysicsObject:loadPersistentData(data)
@@ -270,6 +269,8 @@ function PhysicsObject:isCollidingWith(physObject)
     return distance < (self.radius + physObject.radius)
 end
 
+local collisionEventPayload = {}
+local collisionCbInterface = {}
 function PhysicsObject:handleCollision(hitResult)
     local normal = hitResult.hitNormal
     local velocity = self.velocity
@@ -284,10 +285,16 @@ function PhysicsObject:handleCollision(hitResult)
 
     if dot < 0 then
         -- Run collision callback
-        if isNewContact then 
-            self.onCollision:emit(hitResult) 
+        if isNewContact then             
+            collisionCbInterface.prevent = false
+            self.onCollision:emit(hitResult, collisionCbInterface)
+            
+            -- If a callback user decided to prevent collision - leave now
+            if collisionCbInterface.prevent then return false end
+            
             if hitResult.hitObject then 
-                hitResult.hitObject:sendEvent(D.e.CollidingWithPhysObj, {other = self:serialize()})
+                collisionEventPayload.other = self:serialize()
+                hitResult.hitObject:sendEvent(D.e.CollidingWithPhysObj, collisionEventPayload)
             end
         end    
 
@@ -320,7 +327,7 @@ function PhysicsObject:handleCollision(hitResult)
         -- Run intersection callback
         if isNewContact then self.onIntersection:emit(hitResult) end
         return false
-    end
+    end    
 end
 
 function PhysicsObject:handlePhysObjectCollision(physObject)
