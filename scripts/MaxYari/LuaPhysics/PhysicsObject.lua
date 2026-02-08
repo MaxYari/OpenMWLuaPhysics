@@ -4,6 +4,7 @@ local mp = 'scripts/MaxYari/LuaPhysics/'
 
 local core = require('openmw.core')
 local util = require('openmw.util')
+local types = require('openmw.types')
 
 local nstatus, nearby = pcall(require, "openmw.nearby")
 local sstatus, omwself = pcall(require, "openmw.self")
@@ -92,6 +93,7 @@ function PhysicsObject:init(object, properties)
     self.realignWhenRested = properties.realignWhenRested or false
     self.ignoreWorldCollisions = false
     self.ignorePhysObjectCollisions = false
+    self.ignoreDeadActors = true
     self.radius = radius
     self.largestHalfExtent = largestHalfExtent    
     self.drag = properties.drag or 0.33
@@ -108,6 +110,7 @@ function PhysicsObject:init(object, properties)
     self.player = nil -- Will be received later from global
 
     -- Events    
+    self.onPreCollision = properties.onPreCollision or EventsManager:new()
     self.onCollision = properties.onCollision or EventsManager:new()
     self.onPhysObjectCollision = properties.onPhysObjectCollision or EventsManager:new()
     self.onIntersection = properties.onIntersection or EventsManager:new()
@@ -217,7 +220,8 @@ function PhysicsObject:getPersistentData()
     persistentData.initialPosition = self.initialPosition
     persistentData.initialRotation = self.initialRotation
     persistentData.resetOnLoad = self.resetOnLoad
-    persistentData.ignorePhysObjectCollisions = self.ignorePhysObjectCollisions    
+    persistentData.ignorePhysObjectCollisions = self.ignorePhysObjectCollisions  
+    return persistentData  
 end
 
 function PhysicsObject:loadPersistentData(data)
@@ -282,15 +286,25 @@ function PhysicsObject:handleCollision(hitResult)
     
     self.inContact = newInContact
     self.inContactWith = newInContactWith
+    if isNewContact then
+        self.inContactWithDeadActor = hitResult.hitObject and types.Actor.objectIsInstance(hitResult.hitObject) and types.Actor.isDead(hitResult.hitObject)
+    end
 
     if dot < 0 then
+        
+        collisionCbInterface.prevent = false
+        self.onPreCollision:emit(hitResults, collisionCbInterface)
+        -- If a callback user decided to prevent collision - leave now
+        if collisionCbInterface.prevent then return false end
+        -- If its a dead actor - ignore
+        if self.ignoreDeadActors and self.inContactWithDeadActor then
+            return false
+        end
+
+
         -- Run collision callback
-        if isNewContact then             
-            collisionCbInterface.prevent = false
-            self.onCollision:emit(hitResult, collisionCbInterface)
-            
-            -- If a callback user decided to prevent collision - leave now
-            if collisionCbInterface.prevent then return false end
+        if isNewContact then
+            self.onCollision:emit(hitResult)
             
             if hitResult.hitObject then 
                 collisionEventPayload.other = self:serialize()
