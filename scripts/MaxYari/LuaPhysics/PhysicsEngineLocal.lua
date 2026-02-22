@@ -210,7 +210,7 @@ local function onLoad(data)
 end
 
 local function onInactive(data)
-    print("Object", omwself.recordId, "is inactive")
+    -- print("Object", omwself.recordId, "is inactive")
     core.sendGlobalEvent(D.e.InactivationReport, {
         object = omwself
     })

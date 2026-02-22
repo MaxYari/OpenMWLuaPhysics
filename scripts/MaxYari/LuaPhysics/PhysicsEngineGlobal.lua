@@ -75,12 +75,13 @@ end
 
 -- TO DO: Sleepers shouldnt be checked at all, probably should have their own grid object? But non-sleepers should be checked against sleepers
 -- TO DO: Unloaded objects should be removed from the grid - event should be sent from onInactive
-local collisionEventPayload = {}
+local collisionEventPayload1 = {}
+local collisionEventPayload2 = {}
 local function collidePhysObjects(physObj1, physObj2)
-    collisionEventPayload.other = serialize(physObj2)
-    physObj1.object:sendEvent(D.e.CollidingWithPhysObj, collisionEventPayload)
-    collisionEventPayload.other = serialize(physObj1)
-    physObj2.object:sendEvent(D.e.CollidingWithPhysObj, collisionEventPayload)
+    collisionEventPayload1.other = serialize(physObj2)
+    physObj1.object:sendEvent(D.e.CollidingWithPhysObj, collisionEventPayload1)
+    collisionEventPayload2.other = serialize(physObj1)
+    physObj2.object:sendEvent(D.e.CollidingWithPhysObj, collisionEventPayload2)
 end
 local function checkCollisionsInGrid()
     local alreadyChecked = {}
@@ -189,10 +190,12 @@ local function onUpdate(dt)
     crimeSystemActive = settings:get("CrimeSystemActive")
 
     -- removal of scheduled objects
-    for id, obj in pairs(objectsToRemove) do
-        obj:remove()
+    if next(objectsToRemove) then
+        for id, obj in pairs(objectsToRemove) do
+            obj:remove()
+        end
+        objectsToRemove = {}
     end
-    objectsToRemove = {}
 
     if not PhysMatSystem.initialized then
         PhysMatSystem.init()
