@@ -1,0 +1,16 @@
+# Left out of the Nexus archive (gitignore syntax). Only files committed to git
+# are packed in the first place, so local junk never ends up in there.
+# Preview what gets packed: bash tools/build_nexus_zip.sh && unzip -l nexus-upload.zip
+
+# git and tooling
+.git*
+.nexusignore
+.claude/
+tools/
+__pycache__/
+
+# docs, images and sources (the README lives on the Nexus page itself)
+README.md
+README.nexus.bbcode
+images/
+Sources/

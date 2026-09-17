@@ -22,39 +22,24 @@ Separate thanks to [taitechnic](https://next.nexusmods.com/profile/taitechnic/mo
 
 ### Installation
 
----
+- Recommended (probably not required): install and enable [OpenMW Impact Effects](https://www.nexusmods.com/morrowind/mods/55508).
+- Install this mod **with a mod organiser**: download the archive (or this repository as an archive) and drag and drop it into your mod organiser of choice (e.g [Mod Organizer 2](https://github.com/ModOrganizer2/modorganizer/releases) on Windows or [Nerevarine Organizer](https://github.com/grazelandsnomad/nerevarine_organizer/releases/tag/v0.70) on Linux). **Or** [read this tutorial](https://modding-openmw.com/tips/installing-mods/) on how to install mods using the launcher or completely manually (it's also very easy).
+- Enable LuaPhysicsEngine.omwscripts in the "Content Files" tab of the OpenMW launcher.
 
-Install dependencies:
-[OpenMW Impact Effects](https://www.nexusmods.com/morrowind/mods/55508)
-Highly recommended, but probably not required.
+### Performance
 
----
-Use Mod Organiser 2 - if you downloaded mod archive manually (e.g from Git) - drag-n-drop it into the Mod Organiser 2
+There are 2 performance modes, picked in Settings->Scripts->LuaPhysics:
 
-Or, if you want to install manually:
+- **Potato** (default): minimal to no performance impact - usually none at all, though it depends on how many other Lua mods you're already running. Physics objects collide with the world and actors, but not with each other.
+- **Normal**: physics objects also collide with each other.
 
-Extract contents into your Data Files
-
----
-
-Enable LuaPhysicsEngine.omwscripts in the Launcher
-
----
+Switching modes applies to cells loaded afterwards - change cells or reload a save for items already around you.
 
 ### How to use
 
 Set up a key bind for dragging items around in settings->scripts->LuaPhysics. Drag items around by holding that key. While dragging - press attack key to throw. Hitting items with a weapon or fists will send them flying or even break some of them (some bottles).
 
 Ranged attacks or spells currently DO NOT AFFECT physics objects, since there no OpenMW api exposed yet to manage those. Actors moving through stationary physics objects also will not affect them.
-
-### Performance Mode
-
-Settings->scripts->LuaPhysics has a Performance Mode:
-
-- **Potato** (default): physics objects collide with the world and actors, but not with each other. Items lying still cost next to nothing.
-- **Normal**: physics objects also bump into each other. Items lying around are registered for that as their cells load.
-
-Switching to Normal applies to cells loaded afterwards - change cells or reload a save for items already around you.
 
 ### Changelog
 

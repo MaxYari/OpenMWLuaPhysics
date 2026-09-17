@@ -1,0 +1,5 @@
+#!/bin/sh
+# Keeps README.nexus.bbcode (the Nexus mod page description) in sync with README.md.
+# Enable once per clone: git config core.hooksPath .githooks
+python3 tools/readme_to_nexus.py -o README.nexus.bbcode || exit 1
+git add README.nexus.bbcode

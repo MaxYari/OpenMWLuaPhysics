@@ -1,0 +1,122 @@
+name: Release to Nexus Mods
+
+# Every push to main packs the mod and uploads it as a new version of the main file on the
+# Nexus page below, with the last commit message as its changelog and no file description.
+# Put [skip nexus] in a commit message to push without uploading.
+#
+# The version is the first `version = ...` in VERSION_SOURCE. If Nexus already has it (you didn't
+# bump it), a counter is appended on Nexus only: 1.3 -> 1.3.1 -> 1.3.2 ... until you bump it.
+#
+# The Nexus API can't edit the mod page description. README.nexus.bbcode (kept in sync by the
+# .githooks/pre-commit hook) has it ready to paste; every run also puts a copy with image links
+# pinned to that commit in the job summary.
+#
+# Can also be run by hand: Actions tab -> Release to Nexus Mods -> Run workflow, or
+#   gh workflow run nexus-release.yml [-f version=1.4] [-f changelog="..."]
+#
+# One-time setup: repo Settings -> Secrets and variables -> Actions -> New repository secret
+#   NEXUSMODS_API_KEY = the "Personal API Key" from https://www.nexusmods.com/settings/api-keys
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish (default - the one in the version source file)
+        required: false
+      changelog:
+        description: Changelog text (default - the last commit message)
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-upload
+  cancel-in-progress: false
+
+env:
+  NEXUS_PAGE: https://www.nexusmods.com/morrowind/mods/56589
+  # From the "Advanced" panel of the main file on Nexus. Not secret.
+  NEXUSMODS_FILE_ID: "3322171"
+  NEXUSMODS_MOD_ID: "429496786189" # internal mod ID, not the one from the page URL
+  FILE_DISPLAY_NAME: Lua Physics Engine # Shown on Nexus as "Lua Physics Engine v<version>"
+  ZIP_NAME: LuaPhysicsEngine
+  VERSION_SOURCE: scripts/MaxYari/LuaPhysics/PhysicsEngineLocal.lua
+
+jobs:
+  nexus:
+    # Manual runs have no head commit, so they always upload
+    if: ${{ !contains(github.event.head_commit.message, '[skip nexus]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out version and changelog
+        id: meta
+        env:
+          NEXUSMODS_API_KEY: ${{ secrets.NEXUSMODS_API_KEY }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_CHANGELOG: ${{ inputs.changelog }}
+        run: |
+          base="${INPUT_VERSION:-$(grep -m1 -oiE '\bversion\s*=\s*"?[0-9][0-9A-Za-z.-]*' "$VERSION_SOURCE" | grep -oE '[0-9][0-9A-Za-z.-]*$' || true)}"
+          base="${base#v}"
+          if [ -z "$base" ]; then
+            echo "::error::Could not find 'version = ...' in $VERSION_SOURCE"
+            exit 1
+          fi
+
+          if ! existing=$(curl -fsS -H "apikey: $NEXUSMODS_API_KEY" \
+              "https://api.nexusmods.com/v3/mod-files/$NEXUSMODS_FILE_ID/versions" |
+              python3 -c 'import json, sys; print("\n".join(v["version"] for v in json.load(sys.stdin)["data"]["versions"]))'); then
+            echo "::error::Could not read file versions from Nexus - is the NEXUSMODS_API_KEY secret set?"
+            exit 1
+          fi
+
+          version="$base"
+          n=0
+          while printf '%s\n' "$existing" | grep -qxF "$version"; do
+            n=$((n + 1))
+            version="$base.$n"
+          done
+          echo "Publishing version $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            # Last commit message without Co-authored-by / Signed-off-by style trailers
+            if [ -n "$INPUT_CHANGELOG" ]; then printf '%s\n' "$INPUT_CHANGELOG"
+            else git log -1 --format=%B | sed -E '/^[A-Za-z-]+-by: /Id' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'; fi
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # Image URLs are pinned to this commit, so the pasted description keeps working
+      # even if images are later moved or deleted on the branch.
+      - name: Nexus description to job summary
+        run: |
+          python3 tools/readme_to_nexus.py --ref "${{ github.sha }}" -o "$RUNNER_TEMP/description.bbcode"
+          {
+            echo "### Nexus description"
+            echo "Paste into the mod page description editor: $NEXUS_PAGE"
+            echo '````text'
+            cat "$RUNNER_TEMP/description.bbcode"
+            echo '````'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pack mod archive
+        run: bash tools/build_nexus_zip.sh "$ZIP_NAME-${{ steps.meta.outputs.version }}.zip"
+
+      - name: Upload to Nexus Mods
+        uses: Nexus-Mods/upload-action@v1.0.0-beta.10
+        with:
+          api_key: ${{ secrets.NEXUSMODS_API_KEY }}
+          file_id: ${{ env.NEXUSMODS_FILE_ID }}
+          mod_id: ${{ env.NEXUSMODS_MOD_ID }}
+          filename: ${{ env.ZIP_NAME }}-${{ steps.meta.outputs.version }}.zip
+          display_name: ${{ env.FILE_DISPLAY_NAME }} v${{ steps.meta.outputs.version }}
+          category: main
+          version: ${{ steps.meta.outputs.version }}
+          changelog: ${{ steps.meta.outputs.changelog }}
+          update_mod_version: true
+          archive_existing_version: true

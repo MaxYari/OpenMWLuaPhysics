@@ -1,0 +1,138 @@
+[img]https://raw.githubusercontent.com/MaxYari/OpenMWLuaPhysics/main/images/Physics1.gif[/img]
+
+[img]https://raw.githubusercontent.com/MaxYari/OpenMWLuaPhysics/main/images/Physics2.gif[/img]
+
+[url=https://youtu.be/5klixjQGopU]Watch Video Demo Here[/url]
+
+[size=5][b]Lua Physics for OpenMW[/b][/size]
+
+Version 1.3
+
+A deranged mod that implements a somewhat simple and naive physics engine in pure lua and exposes a rich interface for developers.
+
+Think Half-Life 1 level of physics, maybe a bit better.
+
+Apart from being mostly developer-centered API - this mod also enables physics all of the items in the game (things you can put in you inventory). You can drag them around, throw them and break bottles. But be warned - messing around with someone's property too much - will not be tolerated (if noticed, which depends on your sneak skill, proximity and sheer luck)
+
+[size=4][b]Credits[/b][/size]
+
+Sound Effects: Sound effects were recorded, scavenged from freesound.org or otherwise produced by [url=https://nimsound.ru/]NimSound[/url] and myself. Additionally a sound library "Lesser Vibes" by Sergey Eybog was used.
+
+Separate thanks to [url=https://next.nexusmods.com/profile/taitechnic/mods]taitechnic[/url] for exposing a series of convenient interface functions from OpenMW Impact Effects and helping with visual effects.
+
+[size=4][b]Installation[/b][/size]
+
+[list]
+[*]Recommended (probably not required): install and enable [url=https://www.nexusmods.com/morrowind/mods/55508]OpenMW Impact Effects[/url].
+[*]Install this mod [b]with a mod organiser[/b]: download the archive (or this repository as an archive) and drag and drop it into your mod organiser of choice (e.g [url=https://github.com/ModOrganizer2/modorganizer/releases]Mod Organizer 2[/url] on Windows or [url=https://github.com/grazelandsnomad/nerevarine_organizer/releases/tag/v0.70]Nerevarine Organizer[/url] on Linux). [b]Or[/b] [url=https://modding-openmw.com/tips/installing-mods/]read this tutorial[/url] on how to install mods using the launcher or completely manually (it's also very easy).
+[*]Enable LuaPhysicsEngine.omwscripts in the "Content Files" tab of the OpenMW launcher.
+[/list]
+
+[size=4][b]Performance[/b][/size]
+
+There are 2 performance modes, picked in Settings->Scripts->LuaPhysics:
+
+[list]
+[*][b]Potato[/b] (default): minimal to no performance impact - usually none at all, though it depends on how many other Lua mods you're already running. Physics objects collide with the world and actors, but not with each other.
+[*][b]Normal[/b]: physics objects also collide with each other.
+[/list]
+
+Switching modes applies to cells loaded afterwards - change cells or reload a save for items already around you.
+
+[size=4][b]How to use[/b][/size]
+
+Set up a key bind for dragging items around in settings->scripts->LuaPhysics. Drag items around by holding that key. While dragging - press attack key to throw. Hitting items with a weapon or fists will send them flying or even break some of them (some bottles).
+
+Ranged attacks or spells currently DO NOT AFFECT physics objects, since there no OpenMW api exposed yet to manage those. Actors moving through stationary physics objects also will not affect them.
+
+[size=4][b]Changelog[/b][/size]
+
+1.3
+
+[list]
+[*]Performance Mode setting (Potato / Normal), replacing Self-collisions. Potato is the default.
+[*]Items only set up their physics when something needs it, instead of every item on cell load.
+[*]Settings are no longer read every frame, crime detection idles while nothing moves, the collision grid no longer grows over time.
+[/list]
+
+[size=4][b]Developer API[/b][/size]
+
+Apart from playing around with physics items - primary purpose of this mod is to expose a set of methods that other developers can use to implement physics-based mods.
+
+Every item in a game is physics-enabeld by default.
+
+The physics object of an item is set up lazily: the first time something needs it - any [font=Courier New]LuaPhysics_*[/font] event sent to the object, or reading [font=Courier New]I.LuaPhysics.physicsObject[/font]. You don't need to do anything differently. To hook into an object's physics without forcing it to be set up, use [font=Courier New]I.LuaPhysics.onPhysicsObjectCreated(function(physObject) ... end)[/font] (called right away if it already exists). [font=Courier New]I.LuaPhysics.getPhysicsObject()[/font] does the same as reading [font=Courier New]physicsObject[/font].
+
+Local script of that object exposes the LuaPhysics interface
+
+[code]local I = require('openmw.interfaces')
+local physObject = I.LuaPhysics.physicsObject[/code]
+
+[font=Courier New]physObject[/font] is a representation of a physics object which drives this gameObject. Through this instance you have access to all the physics object properties and functions. See [font=Courier New]PhysicsObject.lua[/font] for a full list. Most likely you would want to use the following methods:
+
+[code]physObject:applyImpulse(impulse, culprit)
+-- Applies a vec3 impulse to an object instantly altering it's velocity. Culprit is a gameobject (NPC) responsible for this impulse application - culprit is used by the crime detections system. If necessary - it's probably safe to set it to nil.
+physObject:updateProperties(properties)
+-- properties is a table of properties mathing property keys found on an instance of physObject (see physicsObject:new() in PhysicsObject.lua for a list of possible properties). It's HIGHLY recommended to use this method to update object's physical properties, instead of setting them directly on an instance. Properties you might be interested in are:
+weight: number, -- Initially weights is determined automatically, but can be overriden using this property
+bounce: number -- 0 - 1: how bouncy is this object?
+--
+-- Some properties of the physObject that you might want to read:
+physObject.velocity  -- vec3 currently velocity of the physics object
+physObject.isSleeping -- if true - object is in a sleep state, its not being simulated, unless acted upon by a player or hit by another object, every object starts in a sleeping state[/code]
+
+Same methods can be triggered by sending an openmw event to a gameObject on which [font=Courier New]PhysicsEngineLocal.lua[/font] is running, such as:
+
+[code]object:sendEvent("LuaPhysics_ApplyImpulse",{
+    impulse = impulse,
+    culprit = culprit
+})
+-- To trigger an applyImpulse method on an object (if such an object is a physics object)
+-- See eventHandlers of PhysicsEngineLocal.lua for a full list of events. As a general rule all events are names "LuaPhysics_EventName" [/code]
+
+If you want to remove a physicsObject from the world - it's paramount to use a special global event for that, instead of gameObject:remove() :
+
+[code]core.sendGlobalEvent("LuaPhysics_RemoveObject",{
+    object = gameObject
+})[/code]
+
+This will ensure that correct cleanup procedures are executed.
+
+Additionally you might want to catch collision events. [i]Every[/i] object, even non-physics ones - will receive collision events through the openmw event system. The regular way of catching such events applies:
+
+[code]eventHandlers = {
+    LuaPhysics_CollidingWithPhysObj = function(eData)
+        eData.other -- This is a serialised data of a physics object which triggered the collision, it's a read-only data, no changes to this data will affect the original physics object
+    end
+}[/code]
+
+More importantly a set of custom event exposed on a [font=Courier New]I.LuaPhysics.physicsObject[/font], note that those are [i]NOT[/i] a part of an OpenMW event system. They are only accessible from a local script throug the exposed inteface:
+
+[code]local physObject = I.LuaPhysics.physicsObject
+
+local function onCollision(collisionData)
+    -- Following fields are available on collisionData
+    collisionData.hitPos
+    collisionData.hitObject
+    collisionData.hitNormal
+    collisionData.hitPhysObject --If collided with another physics object - this will be a serialised data of that other physics object, again - changing this serialised data will not affect another physics object in any way
+end
+
+physObject.onCollision:addEventHandler(onCollision)
+physObject.onPhysObjectCollision:addEventHandler(onCollision)
+     [/code]
+
+Additionally, recently added is a special collision callback that allows you to outright prevent a collision with this specific object
+
+[code]physObject.onPreCollision:addEventHandler(function(collisionData, collisionControl)
+  collisionControl.prevent = true
+  -- This will prevent a collision with this specific object
+end)[/code]
+
+You might also want to attach a handler to [font=Courier New]physObject.onIntersection[/font] - this event supposed to trigger in cases when physicsObject passes through another object without triggering a collision, such as an object spawned inside a collider of another object and passing through from withing onto the outside. That was the intent, but to my knowledge this event is never triggered and from-within passing through a collider is not even possible.
+
+If you want to physics-enable other object types (e.g a Container type) - assign [font=Courier New]PhysicsEngineLocal.lua[/font] to that type via your [font=Courier New].omwscripts[/font] mod file. Note that default config of the physics object works only with collider-less game objects (those objects don't have a grid around them when tcb console command is active). It is possible to use [font=Courier New]PhysicsEngineLocal.lua[/font] with collider objects, but that support is experimental and is slower than the default. To enable it - in a local script of such object set [font=Courier New]physObject.collisionMode = "aabb" (default is "sphere")[/font].
+
+Destructible objects are also supported given one provides appropriate destroyed object chunk meshes - I currently don't feel like describing that system, so if you are interested in using it - look at [font=Courier New]PhysicsDestructibleGlobal.lua[/font] and [font=Courier New]meshes\debris[/font] folder. In short - if theres a collection of debri meshes matching specifi object's mesh name - then this object will be destructible. [font=Courier New]I.LuaPhysicsDestructibles.onPreFracture[/font] event emitter can be used to get notified and to control destructibility of specific objects (e.g to prevent an object from being destroying, even though it has debri meshes).
+
+This is hopefully enough info to implement practically anything. Its totally possible that I've made a crytical typo here or there or forgot to mention something. In that case I can only suggest looking into the source files.
