@@ -8,8 +8,7 @@ local vfs = require('openmw.vfs')
 local nearby = require('openmw.nearby')
 
 local omwself = require('openmw.self')
-
-local PhysicsObject = require(mp..'PhysicsObject')
+local storage = require('openmw.storage')
 
 local D = require(mp..'scripts/physics_defs')
 
@@ -22,12 +21,18 @@ local D = require(mp..'scripts/physics_defs')
 
 -- Main stuff ----------------------------------------------
 ------------------------------------------------------------
+-- Lazy setup: every item gets this script, but most of them never move. So the physics object (and the PhysicsObject
+-- module with everything it requires) is only created the first time something needs it: an event for this object
+-- (impulse, grab, properties, a collision reported by the global script) or another script asking for it through the
+-- interface. Until then the script costs a no-op onUpdate and nothing on cell load.
 local frame = 0
 local lastCell = omwself.cell
-local physicsObject = PhysicsObject:new(omwself, { drag = 0.1, bounce = 0.5, isSleeping = true })
-local lastUnderwater = physicsObject.isUnderwater
+local physicsObject = nil
+local savedPhysicsData = nil -- Save data waiting for the physics object to be created
+local createdHandlers = {}   -- Callbacks waiting for the physics object to be created
+local lastUnderwater = false
 local crossedWater = false
-local lastSleeping = physicsObject.isSleeping
+local lastSleeping = true
 local persistentData = {}
 
 
@@ -137,11 +142,28 @@ local function onCollision(hitResult)
     end
 end
 
-physicsObject.onCollision:addEventHandler(onCollision)
-physicsObject.onPhysObjectCollision:addEventHandler(onCollision)
+local function getPhysicsObject()
+    if physicsObject then return physicsObject end
+
+    local PhysicsObject = require(mp..'PhysicsObject')
+    physicsObject = PhysicsObject:new(omwself, { drag = 0.1, bounce = 0.5, isSleeping = true })
+    lastUnderwater = physicsObject.isUnderwater
+    lastSleeping = physicsObject.isSleeping
+    physicsObject.onCollision:addEventHandler(onCollision)
+    physicsObject.onPhysObjectCollision:addEventHandler(onCollision)
+    if savedPhysicsData then
+        physicsObject:loadPersistentData(savedPhysicsData)
+        savedPhysicsData = nil
+    end
+
+    local handlers = createdHandlers
+    createdHandlers = {}
+    for _, handler in ipairs(handlers) do handler(physicsObject) end
+    return physicsObject
+end
 
 local function onUpdate(dt)
-    if physicsObject.isSleeping or not omwself.count then return end   
+    if not physicsObject or physicsObject.isSleeping or not omwself.count then return end
     
     local cell = omwself.cell
     
@@ -186,13 +208,9 @@ local function onUpdate(dt)
     frame = frame + 1
 end
 
-onUpdate(0)
-
-
-
 local function onSave()
     return {
-        physicsObjectPersistentData = physicsObject:getPersistentData(),
+        physicsObjectPersistentData = physicsObject and physicsObject:getPersistentData() or savedPhysicsData,
         persistentData = persistentData
     }
 end
@@ -206,17 +224,92 @@ local function onLoad(data)
             data = persistentData
         })
     end
-    physicsObject:loadPersistentData(data.physicsObjectPersistentData)
+    savedPhysicsData = data.physicsObjectPersistentData
+    if physicsObject then
+        physicsObject:loadPersistentData(savedPhysicsData)
+        savedPhysicsData = nil
+    elseif savedPhysicsData and savedPhysicsData.resetOnLoad then
+        -- Has to be put back where it came from right away
+        getPhysicsObject()
+    end
 end
 
+local selfCollisionSettings = storage.globalSection('SettingsLuaPhysics')
 local function onInactive(data)
     -- print("Object", omwself.recordId, "is inactive")
+    -- The global script only knows about this object once it was set up, or registered it for self-collisions (Normal
+    -- performance mode)
+    if not physicsObject and selfCollisionSettings:get("PerformanceMode") ~= "Normal" then return end
     core.sendGlobalEvent(D.e.InactivationReport, {
         object = omwself
     })
 end
 
 
+
+local eventHandlers = {
+    [D.e.MoveTo] = function(e)
+        local currentVelocity = physicsObject.velocity;
+        local pushVector = e.position - physicsObject.position - currentVelocity/4;
+
+        if pushVector:length() > e.maxImpulse then
+            pushVector = pushVector:normalize() * e.maxImpulse
+        end
+
+        physicsObject:applyImpulse(pushVector, e.culprit)
+    end,
+    [D.e.ApplyImpulse] = function(e)
+        physicsObject:applyImpulse(e.impulse, e.culprit)
+    end,
+    [D.e.SetPhysicsProperties] = function(props)
+        --print("Received physics properties",gutils.tableToString(props))
+        physicsObject:updateProperties(props)
+    end,
+    [D.e.SetMaterial] = function(e)
+        physicsObject:updateMaterial(e.material, e.recalcMass, e.recalcBuoyancy)
+    end,
+    [D.e.SetPositionUnadjusted] = function(e)
+        physicsObject:setPositionUnadjusted(e.position)
+    end,
+    [D.e.CollidingWithPhysObj] = function(e)
+        --print("Received phys object collide event",e.other.object.recordId)
+        physicsObject:handlePhysObjectCollision(e.other)
+    end,
+    [D.e.UpdatePersistentData] = function(data)
+        persistentData = data
+        core.sendGlobalEvent(D.e.PersistentDataReport, {
+            source = omwself,
+            data = persistentData
+        })
+    end
+}
+
+-- Every event except persistent data needs the physics object: create it on the first one
+for name, handler in pairs(eventHandlers) do
+    if name ~= D.e.UpdatePersistentData then
+        eventHandlers[name] = function(e)
+            getPhysicsObject()
+            return handler(e)
+        end
+    end
+end
+
+local interface = {
+    version = 1.1,
+    -- Returns the physics object, creating it if needed
+    getPhysicsObject = getPhysicsObject,
+    -- Calls handler(physicsObject) once the physics object exists, right away if it already does. Lets other scripts on
+    -- this object hook into it without forcing it to be created.
+    onPhysicsObjectCreated = function(handler)
+        if physicsObject then handler(physicsObject) else createdHandlers[#createdHandlers + 1] = handler end
+    end,
+}
+-- interface.physicsObject still works, creating the physics object when it's first read
+setmetatable(interface, {
+    __index = function(_, key)
+        if key == "physicsObject" then return getPhysicsObject() end
+    end
+})
 
 return {
     engineHandlers = {
@@ -225,44 +318,9 @@ return {
         onLoad = onLoad,
         onInactive = onInactive
     },
-    eventHandlers = {
-        [D.e.MoveTo] = function(e)
-            local currentVelocity = physicsObject.velocity;
-            local pushVector = e.position - physicsObject.position - currentVelocity/4;
-    
-            if pushVector:length() > e.maxImpulse then
-                pushVector = pushVector:normalize() * e.maxImpulse
-            end
-
-            physicsObject:applyImpulse(pushVector, e.culprit)
-        end,
-        [D.e.ApplyImpulse] = function(e)
-            physicsObject:applyImpulse(e.impulse, e.culprit)
-        end,
-        [D.e.SetPhysicsProperties] = function(props)
-            --print("Received physics properties",gutils.tableToString(props))
-            physicsObject:updateProperties(props)
-        end,
-        [D.e.SetMaterial] = function(e)
-            physicsObject:updateMaterial(e.material, e.recalcMass, e.recalcBuoyancy)
-        end,
-        [D.e.SetPositionUnadjusted] = function(e)
-            physicsObject:setPositionUnadjusted(e.position)
-        end,
-        [D.e.CollidingWithPhysObj] = function(e)
-            --print("Received phys object collide event",e.other.object.recordId)
-            physicsObject:handlePhysObjectCollision(e.other)
-        end,
-        [D.e.UpdatePersistentData] = function(data)
-            persistentData = data
-            core.sendGlobalEvent(D.e.PersistentDataReport, {
-                source = omwself,
-                data = persistentData
-            })
-        end
-    },
+    eventHandlers = eventHandlers,
     interfaceName = "LuaPhysics",
-    interface = {version=1.0, physicsObject=physicsObject}
+    interface = interface
     
 }
 

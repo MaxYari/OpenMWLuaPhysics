@@ -11,11 +11,15 @@ I.Settings.registerGroup {
     permanentStorage = true,    
     settings = {
         {
-            key = 'SelfCollisions',
-            renderer = 'checkbox',
-            default = true,
-            name = 'Self-collisions',
-            description = "Do physics objects collide with each other? Keeping disabled may improve performance."
+            key = 'PerformanceMode',
+            renderer = 'select',
+            default = 'Potato',
+            argument = {
+                l10n = 'LuaPhysics',
+                items = { 'Potato', 'Normal' },
+            },
+            name = 'Performance Mode',
+            description = "Potato: physics objects don't collide with each other, only with the world and actors. Items lying still cost next to nothing.\n\nNormal: physics objects also bump into each other, and items lying around are registered for that as their cells load.\n\nSwitching to Normal applies to cells loaded afterwards: change cells or reload a save for items already around you."
         },
         {
             key="DebrisPerExteriorCell",

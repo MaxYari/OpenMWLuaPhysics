@@ -10,8 +10,7 @@ local vfs = require('openmw.vfs')
 local omwself = require('openmw.self')
 local interfaces = require('openmw.interfaces')
 
-local gutils = require(mp..'scripts/gutils')
-local PhysAiSystem = require(mp..'scripts/physics_ai_system')
+-- Required when first needed, not on load: this script is on every misc item (see PhysicsEngineLocal.lua, lazy setup)
 local D = require(mp..'scripts/physics_defs')
 
 --if omwself.recordId ~= "p_restore_health_s" then return end
@@ -39,6 +38,7 @@ local function checkHeardByOwnerOrGuards(culprit)
     -- print("Checking if ",culprit,"is detected")
 
     local factionId = omwself.owner.factionId
+    local PhysAiSystem = require(mp..'scripts/physics_ai_system')
     local owner, guards, factionMembers = PhysAiSystem.findRelevantNPCsInCell(omwself.cell, nearby.actors, ownerId, factionId)
     local checkDetection = function(npcs)
         for _, npc in ipairs(npcs) do
@@ -95,11 +95,13 @@ local function onMaterialUpdate(mat)
     end
 end
 
-local physObject = interfaces.LuaPhysics.physicsObject
-physObject.onCollision:addEventHandler(onCollision)
---physObject.onPhysObjectCollision:addEventHandler(onCollision)
-physObject.onIntersection:addEventHandler(onCollision)
-physObject.onMaterialUpdate:addEventHandler(onMaterialUpdate)
+-- Hooked up once the physics object exists, without forcing it to be created
+interfaces.LuaPhysics.onPhysicsObjectCreated(function(physObject)
+    physObject.onCollision:addEventHandler(onCollision)
+    --physObject.onPhysObjectCollision:addEventHandler(onCollision)
+    physObject.onIntersection:addEventHandler(onCollision)
+    physObject.onMaterialUpdate:addEventHandler(onMaterialUpdate)
+end)
 -- print("Destr object is adding event handlers to physObject")
 
 

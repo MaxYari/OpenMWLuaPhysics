@@ -15,9 +15,9 @@ local PhysAiSystem = require(mp..'scripts/physics_ai_system')
 local EventsManager = require(mp.."scripts/events_manager")
 local D = require(mp..'scripts/physics_defs')
 
-local settings = storage.globalSection('SettingsLuaPhysics')
-local debrisPerExteriorCell = settings:get("DebrisPerExteriorCell")
-local debrisPerInteriorCell = settings:get("DebrisPerInteriorCell")
+local SettingsHelper = require(mp..'scripts/settings_helper')
+-- Cached, refreshed when the settings change (reading a field doesn't hit the storage)
+local settings = SettingsHelper:new(storage.globalSection('SettingsLuaPhysics'))
 
 local publicPropertyDamageRating = 0
 local publicPropertyDamageLimit = 3
@@ -255,7 +255,7 @@ local function handleFractureMe(eventData)
     
 
     -- Handle crime
-    if flags.handleCrime and settings:get("CrimeSystemActive") and eventData.detectedBy and eventData.culprit and eventData.culprit.type == types.Player then
+    if flags.handleCrime and settings.CrimeSystemActive and eventData.detectedBy and eventData.culprit and eventData.culprit.type == types.Player then
         if not PhysAiSystem.canTouch(object, eventData.culprit) then
             -- Instant crime
             PhysAiSystem.reportCrime(object, eventData.culprit, eventData.detectedBy, true)
@@ -336,7 +336,7 @@ local function pruneChunks()
     local cellChunksData = activeChunks[player.cell.id]
     if not cellChunksData then return end
 
-    local chunkLimit = player.cell.isExterior and debrisPerExteriorCell or debrisPerInteriorCell
+    local chunkLimit = player.cell.isExterior and settings.DebrisPerExteriorCell or settings.DebrisPerInteriorCell
     local chunksAmount = cellChunksData.chunksAmount
     local chunksMap = cellChunksData.chunksMap  
 

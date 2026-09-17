@@ -19,7 +19,8 @@ local D = require(mp..'scripts/physics_defs')
 
 local selfActor = gutils.Actor:new(omwself)
 
-local settings = storage.globalSection('SettingsLuaPhysicsAux')
+local SettingsHelper = require(mp..'scripts/settings_helper')
+local settings = SettingsHelper:new(storage.globalSection('SettingsLuaPhysicsAux'))
 local interface = {
     version = 1.0,
     defaultThrowEnabled = true
@@ -31,7 +32,7 @@ local frame = 0
 
 local function onUpdate(dt)
     frame = frame + 1
-    local noColOnShift = settings:get("NoCollisionOnShift")
+    local noColOnShift = settings.NoCollisionOnShift
     -- Utilities update loop
     PhysicsUtils.HoldGrabbedObject(dt, noColOnShift and input.isShiftPressed())
 

@@ -2,6 +2,9 @@ local mp = 'scripts/MaxYari/LuaPhysics/'
 
 local world = require('openmw.world')
 local storage = require("openmw.storage")
+local async = require('openmw.async')
+local util = require('openmw.util')
+local types = require('openmw.types')
 
 local PhysicsObject = require(mp..'PhysicsObject')
 local PhysSoundSystem = require(mp..'scripts/physics_sound_system')
@@ -10,9 +13,11 @@ local PhysAiSystem = require(mp..'scripts/physics_ai_system')
 local D = require(mp..'scripts/physics_defs')
 local gutils = require(mp..'scripts/gutils')
 
-local settings = storage.globalSection('SettingsLuaPhysics')
-local doSelfCollisions = settings:get("SelfCollisions")
-local crimeSystemActive = settings:get("CrimeSystemActive")
+local SettingsHelper = require(mp..'scripts/settings_helper')
+-- Cached, refreshed when the settings change (reading a field doesn't hit the storage)
+local settings = SettingsHelper:new(storage.globalSection('SettingsLuaPhysics'))
+-- Physics objects collide with each other only in the Normal performance mode, not in Potato
+local function selfCollisionsOn() return settings.PerformanceMode == "Normal" end
 
 
 -- local physicsObjectScript = mp.."PhysicsEngineLocal.lua"
@@ -20,10 +25,11 @@ local crimeSystemActive = settings:get("CrimeSystemActive")
 
 -- Defines -----------------
 local frame = 0
-PhysSoundSystem.masterVolume = 2 * settings:get("SFXVolume")
+PhysSoundSystem.masterVolume = 2 * settings.SFXVolume
 
 local physObjectsMap = {}
 local objectsToRemove = {}
+local awakeObjects = {} -- Ids of physics objects that are awake: none means nothing moves
 
 
 -- Grid collision system for dynamic objects ----------------------------------------------
@@ -35,10 +41,30 @@ local function getGridCellCoord(position)
     return math.floor(position.x / gridSize), math.floor(position.y / gridSize), math.floor(position.z / gridSize)
 end
 
+-- Removes an object from its grid cell, and the cell (and its empty parent tables) once it's empty, so the grids don't
+-- keep growing with every place objects ever were
+local function leaveGridCell(physObject)
+    local cell = physObject.gridCell
+    if not cell then return end
+    cell[physObject.object.id] = nil
+    local key = physObject.gridKey
+    if next(cell) == nil and key then
+        local grid, x, y, z = key[1], key[2], key[3], key[4]
+        local ys = grid[x]
+        local zs = ys and ys[y]
+        if zs and zs[z] == cell then
+            zs[z] = nil
+            if next(zs) == nil then ys[y] = nil end
+            if next(ys) == nil then grid[x] = nil end
+        end
+    end
+    physObject.gridCell = nil
+    physObject.gridKey = nil
+end
+
 local function updateInGrid(physObject)
     -- Remove from previous grid cell if needed
-    local lastGridCell = physObject.gridCell
-    if lastGridCell then lastGridCell[physObject.object.id] = nil end
+    leaveGridCell(physObject)
 
     -- Choose grid based on sleep state
     local grid = physObject.isSleeping and grid_sleeping or grid_awake
@@ -50,13 +76,15 @@ local function updateInGrid(physObject)
     local gridCell = grid[cellX][cellY][cellZ]
     gridCell[physObject.object.id] = physObject
     physObject.gridCell = gridCell
+    physObject.gridKey = { grid, cellX, cellY, cellZ }
     physObject.gridType = physObject.isSleeping and "sleeping" or "awake"
 end
 
 local function removeFromGrid(obj)
     local physObj = physObjectsMap[obj.id]
+    awakeObjects[obj.id] = nil
     if physObj then
-        if physObj.gridCell then physObj.gridCell[physObj.object.id] = nil end
+        leaveGridCell(physObj)
         physObjectsMap[obj.id] = nil
     end
 end
@@ -131,11 +159,51 @@ local function onPhysObjPropsUpdate(props)
     end
     
     gutils.shallowMergeTables(physObj, props)
+    if props.isSleeping ~= nil then awakeObjects[id] = (not props.isSleeping) or nil end
     -- Move between grids if sleep state changed
     
-    if doSelfCollisions and not physObj.ignorePhysObjectCollisions then
+    if selfCollisionsOn() and not physObj.ignorePhysObjectCollisions then
         if physObj.position then updateInGrid(physObj) end
+    else
+        leaveGridCell(physObj)
     end
+end
+
+-- Registering sleeping items for self-collisions ---------------------------------------------------
+-- Items only set up their physics object when something needs it (see PhysicsEngineLocal.lua). For thrown objects to
+-- hit sleeping ones, the global script registers sleeping items in the grid itself, from their bounding box, a few per
+-- frame so a cell full of items doesn't cost one frame. The item's own physics object replaces this entry once created.
+local REGISTRATIONS_PER_FRAME = 20
+local registrationQueue = {}
+
+local function registerSleepingItem(object)
+    if physObjectsMap[object.id] or not object:isValid() or object.count == 0 or not object.cell then return end
+    local box = object:getBoundingBox()
+    local halfSize = box.halfSize
+    local volume = (halfSize.x / D.GUtoM) * (halfSize.y / D.GUtoM) * (halfSize.z / D.GUtoM) -- As PhysicsObject:updateMaterial
+    onPhysObjPropsUpdate({
+        object = object,
+        position = box.center,
+        velocity = util.vector3(0, 0, 0),
+        radius = math.max(2, math.min(halfSize.x, halfSize.y, halfSize.z)),
+        mass = math.max(1, volume * 25),
+        bounce = 0.5,
+        isSleeping = true,
+    })
+end
+
+local function processRegistrationQueue()
+    local count = #registrationQueue
+    if count == 0 then return end
+    for i = count, math.max(1, count - REGISTRATIONS_PER_FRAME + 1), -1 do
+        local object = registrationQueue[i]
+        registrationQueue[i] = nil
+        registerSleepingItem(object)
+    end
+end
+
+local function onItemActive(item)
+    if selfCollisionsOn() then registrationQueue[#registrationQueue + 1] = item end
 end
 
 local teleportOpts = {}
@@ -185,9 +253,8 @@ local function onUpdate(dt)
     --print("Global Onupdate frame", frame)
     frame = frame + 1
 
-    -- refetch settings
-    doSelfCollisions = settings:get("SelfCollisions")
-    crimeSystemActive = settings:get("CrimeSystemActive")
+    processRegistrationQueue()
+    PhysSoundSystem.masterVolume = 2 * settings.SFXVolume
 
     -- removal of scheduled objects
     if next(objectsToRemove) then
@@ -201,12 +268,12 @@ local function onUpdate(dt)
         PhysMatSystem.init()
     end
 
-    if doSelfCollisions then
+    if selfCollisionsOn() then
         checkCollisionsInGrid()        
     end
 
-    if crimeSystemActive then
-        PhysAiSystem.update()
+    if settings.CrimeSystemActive then
+        PhysAiSystem.update(next(awakeObjects) ~= nil)
     end
 end
 
@@ -214,7 +281,8 @@ end
 
 return {
     engineHandlers = {
-        onUpdate = onUpdate,        
+        onUpdate = onUpdate,
+        onItemActive = onItemActive,
     },
     eventHandlers = {
         [D.e.UpdateVisPos] = handleUpdateVisPos,
@@ -251,11 +319,11 @@ return {
             data.object:sendEvent(D.e.SetPhysicsProperties, { player = world.players[1]})
         end,
         [D.e.ObjectFenagled] = function(...)
-            if not crimeSystemActive then return end
+            if not settings.CrimeSystemActive then return end
             PhysAiSystem.onObjectFenagled(...)
         end,
         [D.e.DetectCulpritResult] = function(...)
-            if not crimeSystemActive then return end
+            if not settings.CrimeSystemActive then return end
             PhysAiSystem.onDetectCulpritResult(...)
         end
     },

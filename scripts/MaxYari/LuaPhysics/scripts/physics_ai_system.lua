@@ -273,11 +273,26 @@ local function reportCrime(objectOrPrice, culprit, witness, isDestroyed)
 end
 module.reportCrime = reportCrime
 
-local function update()
+local function update(anyObjectAwake)
     -- When a physics object is moved around by a culprit (player) - we collect all actors that might be interested in reporting a crime
     -- and then here we check if they detected a culprit here, detetction checks use raycasts, so for optimisation purposes only few
     -- of them are done per frame
+    local now = core.getRealTime()
     for recordId, c in pairs(fenagleCulprits) do
+        -- Wipe culprit and objects data on cell change (before anything else, so data from the old cell never reports)
+        if not c.lastCell then c.lastCell = c.culprit.cell end
+        if c.culprit.cell ~= c.lastCell then
+            print("Culprit"..recordId.." changed cell, wiping culprit data.")
+            fenagleCulprits[recordId] = nil
+            goto continue
+        end
+
+        -- Nothing can change while no object was touched recently (the reset below already ran) and no physics object
+        -- is awake: every tracked object sits still. The data is kept, just not checked every frame.
+        if not anyObjectAwake and c.updatedAt and now - c.updatedAt > culpritDataTTL * 2 then
+            goto continue
+        end
+
         if c:isValid() then
             -- Attempt to detect culprit
             if not c.detectedBy then
@@ -322,12 +337,7 @@ local function update()
             c.detectedOffenses = 0
         end
 
-        -- Wipe culprit and objects data on cell change
-        if not c.lastCell then c.lastCell = c.culprit.cell end
-        if c.culprit.cell ~= c.lastCell then
-            print("Culprit"..recordId.." changed cell, wiping culprit data.")
-            fenagleCulprits[recordId] = nil
-        end
+        ::continue::
     end
 end
 

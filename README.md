@@ -6,6 +6,8 @@
 
 ## Lua Physics for OpenMW
 
+Version 1.3
+
 A deranged mod that implements a somewhat simple and naive physics engine in pure lua and exposes a rich interface for developers.
 
 Think Half-Life 1 level of physics, maybe a bit better.
@@ -45,11 +47,29 @@ Set up a key bind for dragging items around in settings->scripts->LuaPhysics. Dr
 
 Ranged attacks or spells currently DO NOT AFFECT physics objects, since there no OpenMW api exposed yet to manage those. Actors moving through stationary physics objects also will not affect them.
 
+### Performance Mode
+
+Settings->scripts->LuaPhysics has a Performance Mode:
+
+- **Potato** (default): physics objects collide with the world and actors, but not with each other. Items lying still cost next to nothing.
+- **Normal**: physics objects also bump into each other. Items lying around are registered for that as their cells load.
+
+Switching to Normal applies to cells loaded afterwards - change cells or reload a save for items already around you.
+
+### Changelog
+
+1.3
+- Performance Mode setting (Potato / Normal), replacing Self-collisions. Potato is the default.
+- Items only set up their physics when something needs it, instead of every item on cell load.
+- Settings are no longer read every frame, crime detection idles while nothing moves, the collision grid no longer grows over time.
+
 ### Developer API
 
 Apart from playing around with physics items - primary purpose of this mod is to expose a set of methods that other developers can use to implement physics-based mods.
 
 Every item in a game is physics-enabeld by default. 
+
+The physics object of an item is set up lazily: the first time something needs it - any `LuaPhysics_*` event sent to the object, or reading `I.LuaPhysics.physicsObject`. You don't need to do anything differently. To hook into an object's physics without forcing it to be set up, use `I.LuaPhysics.onPhysicsObjectCreated(function(physObject) ... end)` (called right away if it already exists). `I.LuaPhysics.getPhysicsObject()` does the same as reading `physicsObject`.
 
 Local script of that object exposes the LuaPhysics interface
 
