@@ -125,19 +125,16 @@ local function checkCollisionsInGrid()
                 -- Check awake vs awake
                 for id1, physObj1 in pairs(awakeObjects) do
                     for id2, physObj2 in pairs(awakeObjects) do
-                        if physObj1.object == physObj2.object or alreadyChecked[physObj2] then goto continue_awake end
-                        if PhysicsObject.isCollidingWith(physObj1, physObj2) then
+                        if physObj1.object ~= physObj2.object and not alreadyChecked[physObj2]
+                            and PhysicsObject.isCollidingWith(physObj1, physObj2) then
                             collidePhysObjects(physObj1, physObj2)
                         end
-                        ::continue_awake::
                     end
                     -- Check awake vs sleeping
                     for id2, physObj2 in pairs(sleepingObjects) do
-                        --if physObj1.object == physObj2.object then goto continue_sleeping end
                         if PhysicsObject.isCollidingWith(physObj1, physObj2) then
                             collidePhysObjects(physObj1, physObj2)
                         end
-                        ::continue_sleeping::
                     end
                     alreadyChecked[physObj1] = true
                 end

@@ -1,18 +1,28 @@
 name: Release to Nexus Mods
 
-# Every push to main packs the mod and uploads it as a new version of the main file on the
-# Nexus page below, with the last commit message as its changelog and no file description.
-# Put [skip nexus] in a commit message to push without uploading.
+# A push to main packs the mod and uploads it as a new version of the main file on the Nexus page
+# below, but only when the last commit pushed has a message starting with [nexus] (any case).
+# Anything else is pushed without uploading.
+#
+# That commit's description - everything under its first line - becomes both the file description
+# and the version's changelog. Co-authored-by / Signed-off-by style trailers are left out. With no
+# description, the first line is used instead, minus the [nexus] tag. For example:
+#
+#   [nexus] Fixed removing objects mid-flight
+#
+#   Removing a physics object while it is in flight no longer errors.
 #
 # The version is the first `version = ...` in VERSION_SOURCE. If Nexus already has it (you didn't
-# bump it), a counter is appended on Nexus only: 1.3 -> 1.3.1 -> 1.3.2 ... until you bump it.
+# bump it), a counter is appended on Nexus only: 1.4 -> 1.4.1 -> 1.4.2 ... until you bump it.
 #
 # The Nexus API can't edit the mod page description. README.nexus.bbcode (kept in sync by the
 # .githooks/pre-commit hook) has it ready to paste; every run also puts a copy with image links
 # pinned to that commit in the job summary.
 #
 # Can also be run by hand: Actions tab -> Release to Nexus Mods -> Run workflow, or
-#   gh workflow run nexus-release.yml [-f version=1.4] [-f changelog="..."]
+#   gh workflow run nexus-release.yml [-f version=1.5] [-f changelog="..."]
+# A manual run always uploads, and changelog (when given) replaces the commit's description in both
+# places.
 #
 # One-time setup: repo Settings -> Secrets and variables -> Actions -> New repository secret
 #   NEXUSMODS_API_KEY = the "Personal API Key" from https://www.nexusmods.com/settings/api-keys
@@ -26,7 +36,7 @@ on:
         description: Version to publish (default - the one in the version source file)
         required: false
       changelog:
-        description: Changelog text (default - the last commit message)
+        description: Changelog and file description text (default - the last commit's description)
         required: false
 
 permissions:
@@ -47,13 +57,14 @@ env:
 
 jobs:
   nexus:
-    # Manual runs have no head commit, so they always upload
-    if: ${{ !contains(github.event.head_commit.message, '[skip nexus]') }}
+    # Pushes upload only when the last pushed commit asks for it. startsWith ignores case. Manual runs
+    # have no head commit, so they always upload.
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, '[nexus]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Work out version and changelog
+      - name: Work out version, changelog and description
         id: meta
         env:
           NEXUSMODS_API_KEY: ${{ secrets.NEXUSMODS_API_KEY }}
@@ -83,12 +94,21 @@ jobs:
           echo "Publishing version $version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+          if [ -n "$INPUT_CHANGELOG" ]; then
+            notes="$INPUT_CHANGELOG"
+          else
+            # The commit's description, without trailers or leading blank lines. $( ) drops the
+            # trailing ones.
+            notes=$(git log -1 --format=%b | sed -E '/^[A-Za-z-]+-by: /Id' | sed '/./,$!d')
+            if [ -z "$notes" ]; then
+              notes=$(git log -1 --format=%s | sed -E 's/^\[nexus\][[:space:]]*//I')
+            fi
+          fi
+          printf 'Changelog and file description:\n%s\n' "$notes"
           {
-            echo "changelog<<CHANGELOG_EOF"
-            # Last commit message without Co-authored-by / Signed-off-by style trailers
-            if [ -n "$INPUT_CHANGELOG" ]; then printf '%s\n' "$INPUT_CHANGELOG"
-            else git log -1 --format=%B | sed -E '/^[A-Za-z-]+-by: /Id' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'; fi
-            echo "CHANGELOG_EOF"
+            echo "notes<<NOTES_EOF"
+            printf '%s\n' "$notes"
+            echo "NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
 
       # Image URLs are pinned to this commit, so the pasted description keeps working
@@ -117,6 +137,7 @@ jobs:
           display_name: ${{ env.FILE_DISPLAY_NAME }} v${{ steps.meta.outputs.version }}
           category: main
           version: ${{ steps.meta.outputs.version }}
-          changelog: ${{ steps.meta.outputs.changelog }}
+          description: ${{ steps.meta.outputs.notes }}
+          changelog: ${{ steps.meta.outputs.notes }}
           update_mod_version: true
           archive_existing_version: true

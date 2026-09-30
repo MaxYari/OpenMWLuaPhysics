@@ -281,63 +281,62 @@ local function update(anyObjectAwake)
     for recordId, c in pairs(fenagleCulprits) do
         -- Wipe culprit and objects data on cell change (before anything else, so data from the old cell never reports)
         if not c.lastCell then c.lastCell = c.culprit.cell end
-        if c.culprit.cell ~= c.lastCell then
+        local cellChanged = c.culprit.cell ~= c.lastCell
+        if cellChanged then
             print("Culprit"..recordId.." changed cell, wiping culprit data.")
             fenagleCulprits[recordId] = nil
-            goto continue
         end
 
         -- Nothing can change while no object was touched recently (the reset below already ran) and no physics object
         -- is awake: every tracked object sits still. The data is kept, just not checked every frame.
-        if not anyObjectAwake and c.updatedAt and now - c.updatedAt > culpritDataTTL * 2 then
-            goto continue
-        end
+        local idle = not anyObjectAwake and c.updatedAt and now - c.updatedAt > culpritDataTTL * 2
 
-        if c:isValid() then
-            -- Attempt to detect culprit
-            if not c.detectedBy then
-                runDistributedDetection(c)
-            end
-            if c.detectedBy then
-                -- If we were detected throughought the last second - move all important data (objects touched, offenses commited)
-                -- into persistant variables. I.e npcs will "remember" the things you did during that second, since they detected you
-                -- next ~= nil checks if table is not empty
-                if next(c.fenagledObjects) ~= nil then
-                    -- fenagledObjects are reset every 1 sec, but detected fenagled objects stay until cell transition
-                    gutils.shallowMergeTables(c.detectedFenagledObjects, c.fenagledObjects)
-                    c.fenagledObjects = {}
+        if not cellChanged and not idle then
+            if c:isValid() then
+                -- Attempt to detect culprit
+                if not c.detectedBy then
+                    runDistributedDetection(c)
                 end
-                c.detectedOffenses = c.detectedOffenses + c.offenses
+                if c.detectedBy then
+                    -- If we were detected throughought the last second - move all important data (objects touched, offenses commited)
+                    -- into persistant variables. I.e npcs will "remember" the things you did during that second, since they detected you
+                    -- next ~= nil checks if table is not empty
+                    if next(c.fenagledObjects) ~= nil then
+                        -- fenagledObjects are reset every 1 sec, but detected fenagled objects stay until cell transition
+                        gutils.shallowMergeTables(c.detectedFenagledObjects, c.fenagledObjects)
+                        c.fenagledObjects = {}
+                    end
+                    c.detectedOffenses = c.detectedOffenses + c.offenses
+                    c.offenses = 0
+                    c.lastDetectedBy = c.detectedBy
+                end
+            else            
+                c.detectedBy = nil
+                c.fenagledObjects = {}
                 c.offenses = 0
-                c.lastDetectedBy = c.detectedBy
             end
-        else            
-            c.detectedBy = nil
-            c.fenagledObjects = {}
-            c.offenses = 0
-        end
 
-        -- Check if player went too far with detected object and needs to be crimed
-        for _, objData in pairs(c.detectedFenagledObjects) do
-            if objData.obj:isValid() and objData.obj.cell and (objData.obj.position - objData.startPos):length() > offensiveDragDistance then
-                print("CRIME CRIME CRIME, "..objData.obj.recordId.." WAS MOVED TOO MUCH")
-                reportCrime(objData.obj, c.culprit, c.lastDetectedBy, false)
-                c.detectedFenagledObjects = {}
-                break
+            -- Check if player went too far with detected object and needs to be crimed
+            for _, objData in pairs(c.detectedFenagledObjects) do
+                if objData.obj:isValid() and objData.obj.cell and (objData.obj.position - objData.startPos):length() > offensiveDragDistance then
+                    print("CRIME CRIME CRIME, "..objData.obj.recordId.." WAS MOVED TOO MUCH")
+                    reportCrime(objData.obj, c.culprit, c.lastDetectedBy, false)
+                    c.detectedFenagledObjects = {}
+                    break
+                end
             end
-        end
 
-        -- Check if player commited too many offenses
-        if c.detectedOffenses > maxMinorOffenses then
-            print("CRIME CRIME CRIME, TOO MANY OFFENSES "..c.detectedOffenses)
-            for key, objData in pairs(c.detectedFenagledObjects) do
-                reportCrime(objData.obj, c.culprit, c.lastDetectedBy, false)
-                break
+            -- Check if player commited too many offenses
+            if c.detectedOffenses > maxMinorOffenses then
+                print("CRIME CRIME CRIME, TOO MANY OFFENSES "..c.detectedOffenses)
+                for key, objData in pairs(c.detectedFenagledObjects) do
+                    reportCrime(objData.obj, c.culprit, c.lastDetectedBy, false)
+                    break
+                end
+                c.detectedOffenses = 0
             end
-            c.detectedOffenses = 0
-        end
 
-        ::continue::
+        end
     end
 end
 

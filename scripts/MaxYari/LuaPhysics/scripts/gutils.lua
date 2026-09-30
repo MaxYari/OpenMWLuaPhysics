@@ -400,9 +400,8 @@ function Actor:getDumpableInventoryItems()
     local invItems = inventory:getAll()
 
     for i, item in pairs(invItems) do
-        if (types.Armor.objectIsInstance(item) or types.Clothing.objectIsInstance(item)) and self:hasEquipped(item) then goto continue end
-        table.insert(items, item)
-        ::continue::
+        local isEquippedWearable = (types.Armor.objectIsInstance(item) or types.Clothing.objectIsInstance(item)) and self:hasEquipped(item)
+        if not isEquippedWearable then table.insert(items, item) end
     end
 
     return items

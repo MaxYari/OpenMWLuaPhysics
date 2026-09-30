@@ -38,32 +38,28 @@ local function calcSpherePosAtHit(from, to, hitPos, radius)
     local dist1 = 0
     local dist2 = 0
 
-    if (from - hitPos):length() < radius then        
-        dist = 0
-        goto out
+    -- Early-outs return the ray origin (dist = 0)
+    if (from - hitPos):length() < radius then
+        return o
     end
-    
+
     Det = u:dot(o - c)^2 - (o - c):length()^2 + r * r
-    
+
     if Det < 0 and Det > -0.1 then Det = 0
-    elseif Det <= -0.1 then 
-        dist = 0 
-        goto out
+    elseif Det <= -0.1 then
+        return o
     end
 
     dist1 = - u:dot(o - c) + math.sqrt(Det)
     dist2 = - u:dot(o - c) - math.sqrt(Det)
-    
-    if dist1 < 0 and dist2 < 0 then        
-        dist = 0
-        goto out
+
+    if dist1 < 0 and dist2 < 0 then
+        return o
     end
 
     if dist1 < 0 then dist = dist2
     elseif dist2 < 0 then dist = dist1
     else dist = math.min(dist1, dist2) end
-
-    ::out::
 
     local pos = o + u * dist
     

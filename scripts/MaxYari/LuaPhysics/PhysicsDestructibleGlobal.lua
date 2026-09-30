@@ -285,10 +285,10 @@ local function generateTestChunks(e)
     for objName, chunks in pairs(debrisMap) do
         for filePath, recId in pairs(chunks) do
             recordId = recId
-            goto fullbreak
+            break
         end
+        if recordId then break end
     end
-    ::fullbreak::
 
     if not recordId then
         print("No recordId found for test chunks.")
@@ -355,7 +355,6 @@ local function pruneChunks()
                 cellChunksData.chunksAmount = cellChunksData.chunksAmount - 1
                 excess = excess - 1
             end
-            ::continue::
             if excess <= 0 then break end
         end
     end
