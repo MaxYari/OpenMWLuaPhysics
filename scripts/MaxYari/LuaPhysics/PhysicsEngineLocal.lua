@@ -295,7 +295,7 @@ for name, handler in pairs(eventHandlers) do
 end
 
 local interface = {
-    version = 1.3,
+    version = 1.4,
     -- Returns the physics object, creating it if needed
     getPhysicsObject = getPhysicsObject,
     -- Calls handler(physicsObject) once the physics object exists, right away if it already does. Lets other scripts on

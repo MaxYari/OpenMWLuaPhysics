@@ -29,6 +29,9 @@ PhysSoundSystem.masterVolume = 2 * settings.SFXVolume
 
 local physObjectsMap = {}
 local objectsToRemove = {}
+local removalAttempts = {}
+-- Frames an object queued for removal may keep a count of 0 before it's given up on (see removeScheduledObjects)
+local REMOVAL_ATTEMPTS = 10
 local awakeObjects = {} -- Ids of physics objects that are awake: none means nothing moves
 
 
@@ -245,6 +248,32 @@ local function removeObject(obj)
     removeFromGrid(obj)
 end
 
+-- Removes an object, or says it has to wait. A count of 0 is an object in the middle of a teleport - the engine zeroes
+-- the count when a teleport is asked for and restores it once the teleport happens - and remove() throws on it. Every
+-- moving physics object is teleported each frame, so that's any object removed in flight. A queued object isn't
+-- teleported again (see handleUpdateVisPos), so by the next frame it can go. A count that stays 0 is an object that
+-- was removed some other way, and is let go of after a few frames.
+local function tryRemove(obj)
+    if not obj:isValid() then return true end
+    if obj.count == 0 then return false end
+    obj:remove()
+    return true
+end
+
+local function removeScheduledObjects()
+    for id, obj in pairs(objectsToRemove) do
+        local ok, done = pcall(tryRemove, obj)
+        if not ok then print("LuaPhysics: could not remove " .. tostring(obj) .. ": " .. tostring(done)) end
+        local attempts = (removalAttempts[id] or 0) + 1
+        if not ok or done or attempts >= REMOVAL_ATTEMPTS then
+            objectsToRemove[id] = nil
+            removalAttempts[id] = nil
+        else
+            removalAttempts[id] = attempts
+        end
+    end
+end
+
 
 
 -- onUpdate ----- 
@@ -257,12 +286,7 @@ local function onUpdate(dt)
     PhysSoundSystem.masterVolume = 2 * settings.SFXVolume
 
     -- removal of scheduled objects
-    if next(objectsToRemove) then
-        for id, obj in pairs(objectsToRemove) do
-            obj:remove()
-        end
-        objectsToRemove = {}
-    end
+    if next(objectsToRemove) then removeScheduledObjects() end
 
     if not PhysMatSystem.initialized then
         PhysMatSystem.init()
@@ -329,7 +353,8 @@ return {
     },
     interfaceName = "LuaPhysics",
     interface = {
-        version = 1.0,
+        -- 1.1: removeObject is safe for objects in flight, and for ones already removed
+        version = 1.1,
         playCrashSound = PhysSoundSystem.playCrashSound,
         playSound = PhysSoundSystem.playSound,
         getMaterialFromObject = PhysMatSystem.getMaterialFromObject,

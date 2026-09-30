@@ -6,7 +6,7 @@
 
 [size=5][b]Lua Physics for OpenMW[/b][/size]
 
-Version 1.3
+Version 1.4
 
 A deranged mod that implements a somewhat simple and naive physics engine in pure lua and exposes a rich interface for developers.
 
@@ -46,6 +46,12 @@ Set up a key bind for dragging items around in settings->scripts->LuaPhysics. Dr
 Ranged attacks or spells currently DO NOT AFFECT physics objects, since there no OpenMW api exposed yet to manage those. Actors moving through stationary physics objects also will not affect them.
 
 [size=4][b]Changelog[/b][/size]
+
+1.4
+
+[list]
+[*]Removing a physics object while it is in flight ([font=Courier New]LuaPhysics_RemoveObject[/font], [font=Courier New]I.LuaPhysics.removeObject[/font]) no longer errors, and neither does asking to remove one that is already gone. The global [font=Courier New]I.LuaPhysics[/font] interface is now version 1.1.
+[/list]
 
 1.3
 
@@ -96,7 +102,7 @@ If you want to remove a physicsObject from the world - it's paramount to use a s
     object = gameObject
 })[/code]
 
-This will ensure that correct cleanup procedures are executed.
+This will ensure that correct cleanup procedures are executed. From a global script [font=Courier New]I.LuaPhysics.removeObject(gameObject)[/font] does the same. It's safe to use on an object that is still in flight - it's removed on the next frame - and on one that's already gone (global interface version 1.1 and up).
 
 Additionally you might want to catch collision events. [i]Every[/i] object, even non-physics ones - will receive collision events through the openmw event system. The regular way of catching such events applies:
 
